@@ -41,10 +41,30 @@ enum PreviewRenderer {
             write(image, to: directory.appendingPathComponent("\(name).png"))
         }
 
-        renderPopover(session: session, weekly: weekly, fable: fable,
-                      to: directory.appendingPathComponent("popover.png"))
+        renderPopovers(session: session, weekly: weekly, fable: fable, into: directory)
 
-        print("wrote \(cases.count + 1) previews to \(directory.path)")
+        print("wrote \(cases.count + ChartRange.allCases.count) previews to \(directory.path)")
+    }
+
+    /// One image per range: a chart that reads well over six hours can be unreadable
+    /// over thirty days, and the reverse.
+    private static func renderPopovers(
+        session: UsageLimit,
+        weekly: UsageLimit,
+        fable: UsageLimit,
+        into directory: URL
+    ) {
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: PreferenceKey.chartRange)
+        defer { defaults.set(previous, forKey: PreferenceKey.chartRange) }
+
+        for range in ChartRange.allCases {
+            defaults.set(range.rawValue, forKey: PreferenceKey.chartRange)
+            renderPopover(
+                session: session, weekly: weekly, fable: fable,
+                to: directory.appendingPathComponent("popover-\(range.rawValue).png")
+            )
+        }
     }
 
     private static func renderPopover(
@@ -93,23 +113,47 @@ enum PreviewRenderer {
         window.orderOut(nil)
     }
 
-    /// A believable few hours of polling: usage climbs, with the session window
-    /// resetting once along the way.
+    /// Thirty days of quarter-hourly polling, so every range of the picker has data:
+    /// the session window sawtooths every five hours, the weekly windows climb and drop
+    /// on their own boundary, and the last one lands on the snapshot's own value.
+    ///
+    /// Deterministic on purpose — a preview that differs from one run to the next is
+    /// useless for comparing two designs.
     private static func syntheticHistory(for snapshot: UsageSnapshot) -> [UsageSample] {
         let now = Date()
-        return (0..<48).map { step in
-            let age = Double(47 - step) * 300
-            let progress = Double(step) / 47
+        let step: TimeInterval = 900
+        let count = Int(30 * 86_400 / step)
+
+        return (0..<count).map { index in
+            let age = Double(count - 1 - index) * step
+            let elapsed = Double(index) * step
+
             var values: [String: Double] = [:]
             for limit in snapshot.limits {
-                let target = limit.percent
-                let ramp = target * progress
-                values[limit.id] = limit.isSession && step < 20
-                    ? max(0, 88 * (Double(step) / 20))
-                    : ramp
+                let seed = Double(abs(limit.id.hashValue) % 97)
+                values[limit.id] = utilisation(of: limit, elapsed: elapsed, age: age, seed: seed)
             }
             return UsageSample(date: now.addingTimeInterval(-age), values: values)
         }
+    }
+
+    private static func utilisation(
+        of limit: UsageLimit,
+        elapsed: TimeInterval,
+        age: TimeInterval,
+        seed: Double
+    ) -> Double {
+        let period: TimeInterval = limit.isSession ? 5 * 3600 : 7 * 86_400
+        let phase = elapsed.truncatingRemainder(dividingBy: period) / period
+
+        // The window still running has to end on the value the snapshot reports.
+        if age < period { return limit.percent * max(0, min(1, 1 - age / period)) }
+
+        // Work comes in bursts, and mostly during the day.
+        let burst = 0.55 + 0.45 * sin(elapsed / 9_000 + seed)
+        let daytime = 0.35 + 0.65 * max(0, sin(elapsed / 86_400 * 2 * .pi - 1.2))
+        let ceiling = 45 + seed.truncatingRemainder(dividingBy: 50)
+        return max(0, min(100, ceiling * phase * burst * daytime * 1.6))
     }
 
     /// Template images carry no colour; draw them onto a light background at 4× so the
