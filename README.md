@@ -118,7 +118,7 @@ Requires macOS 14+ and Swift 6.
 ```bash
 git clone https://github.com/my-monkeys/monkey-claude-usage.git
 cd monkey-claude-usage
-swift test                 # 9 tests over the payload parsing, countdowns and history
+swift test                 # 11 tests over the payload parsing, countdowns and history
 ./scripts/build-dmg.sh     # → dist/Monkey Claude Usage.app and dist/MonkeyClaudeUsage-<v>.dmg
 ```
 

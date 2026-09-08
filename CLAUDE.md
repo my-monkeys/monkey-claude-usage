@@ -10,7 +10,7 @@ chaîne d'attribution est dans `LICENSE` et le README, **ne pas la retirer**.
 ## Commandes
 
 ```bash
-swift test                 # 9 tests (parsing, compte à rebours, historique)
+swift test                 # 11 tests (parsing, compte à rebours, historique)
 swift build                # les deux targets
 ./scripts/build-dmg.sh     # dist/Monkey Claude Usage.app + dist/MonkeyClaudeUsage-<v>.dmg
 ./scripts/release.sh 1.0.0 # signe, notarise, tag, release GitHub, met à jour le cask

@@ -200,8 +200,9 @@ cask "monkey-claude-usage" do
   version "$VERSION"
   sha256 "$SHA256"
 
-  url "https://github.com/$REPO/releases/download/v#{version}/MonkeyClaudeUsage-#{version}.dmg",
-      verified: "github.com/$REPO/"
+  # No \`verified:\` — Homebrew 6 deprecated it, and the download URL already sits under
+  # the homepage host, which is what the default verification checks.
+  url "https://github.com/$REPO/releases/download/v#{version}/MonkeyClaudeUsage-#{version}.dmg"
   name "Monkey Claude Usage"
   desc "Menu bar tracker for Claude usage limits across several accounts"
   homepage "https://github.com/$REPO"
