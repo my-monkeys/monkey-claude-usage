@@ -79,12 +79,63 @@ gère le contraste). Trois règles qui ne se devinent pas :
 La hauteur utile est de 18 pt : `Metrics.rowGeometry` réduit la hauteur des barres quand il y
 a plus de trois fenêtres. Au-delà de cinq, ça devient illisible — préférer alors le popover.
 
-## Historique
+## Deux historiques, et un seul est rattachable à un compte
 
-L'API ne renvoie **aucun historique**. Chaque relevé réussi est ajouté à
-`~/Library/Application Support/fr.mymonkey.monkeyclaudeusage/history/<uuid>.json`, élagué à
-l'écriture. Le graphique est donc vide à l'installation et ne peut rien montrer d'une période
-où l'app ne tournait pas — le dire plutôt que de laisser croire à un bug.
+⚠️ **L'API ne renvoie aucun historique** — seulement un niveau instantané. D'où deux sources,
+qu'il ne faut pas confondre :
+
+1. **Quota, par compte** — chaque relevé réussi est ajouté à
+   `~/Library/Application Support/fr.mymonkey.monkeyclaudeusage/history/<uuid>.json`, élagué
+   à l'écriture. Vide à l'installation, et incapable de montrer une période où l'app ne
+   tournait pas : le dire plutôt que de laisser croire à un bug. C'est ce qui alimente les
+   barres de session (`ConsumptionSeries`) et les lignes hebdomadaires (`LevelSeries`).
+2. **Activité locale, sans compte** — `LocalActivityStore` lit les transcriptions de Claude
+   Code sous `~/.claude/projects/**/*.jsonl`. Trois mois d'historique réel, disponibles dès
+   la première ouverture.
+
+⚠️ **Les transcriptions ne portent aucun identifiant de compte** (vérifié : ni `account`, ni
+`org`, ni e-mail). L'activité locale est donc **volontairement hors des onglets de compte** —
+la rattacher à l'onglet sélectionné serait un mensonge. Ne pas « améliorer » ça.
+
+⚠️ Trois pièges de performance, tous mesurés sur 1,7 Go de transcriptions :
+- `ISO8601DateFormatter` alloué par appel coûtait **35 s** sur 96 000 lignes. D'où
+  `Date.ISO8601FormatStyle`, qui est une valeur `Sendable` construite une fois.
+- Accumuler dans un `Data` puis le re-trancher recopie le reste à chaque ligne (O(n²)) :
+  50 s. D'où le fichier mappé parcouru au `memchr`/`memmem`.
+- **Chaque message assistant est écrit deux fois** dans sa transcription — 46 945 doublons
+  sur 48 608 identifiants. Sans déduplication, tous les chiffres sont doublés. L'empreinte
+  est un FNV-1a et non `hashValue`, qui est resemé à chaque lancement et invaliderait le cache.
+
+Bilan : 10 s au premier balayage, 0,1 s ensuite.
+
+## Session et semaine ne partagent pas de repère
+
+La fenêtre de session tourne cinq fois par jour, les hebdomadaires une fois par semaine. Sur
+une échelle commune, celle qui bouge le moins est écrasée. D'où deux formes distinctes dans
+`QuotaHistoryView` : **barres de consommation** pour la session (points de quota brûlés par
+seau), **ligne de niveau** pour chaque fenêtre hebdomadaire.
+
+⚠️ Une baisse de niveau entre deux relevés est un **reset**, pas une consommation négative.
+`ConsumptionSeries` la traite comme telle, marque la frontière, et laisse **vides** les seaux
+que l'app n'a pas observés plutôt que d'étaler un saut sur des heures où il n'a pas eu lieu.
+
+⚠️ `BarMark(x:unit:)` avec `.second` donne des barres larges d'une seconde, donc invisibles.
+Un seau de quinze minutes n'étant pas une unité de calendrier, les barres se posent en
+`xStart`/`xEnd`.
+
+## Verre liquide (macOS 26+)
+
+`UI/LiquidGlass.swift` va chercher `glassEffect` derrière `#available(macOS 26, *)` plutôt que
+de relever la cible de déploiement — une utilitaire de barre de menus est précisément ce qu'on
+garde sur une machine ancienne.
+
+⚠️ **Le verre échantillonne la fenêtre derrière lui.** Là où il n'y a rien à échantillonner,
+l'effet ne rend **rien du tout** : un onglet devient invisible. D'où le fond plein toujours
+posé, le verre seulement par-dessus. Et `GlassEffectContainer` fait disparaître tout son
+contenu dans un rendu hors écran — il n'est pas utilisé.
+
+Les contrôles standard gardent leur style système : ils prennent le nouveau look tout seuls
+une fois compilés contre le SDK Tahoe.
 
 ## Séparation des targets
 

@@ -11,7 +11,7 @@
 [![macOS](https://img.shields.io/badge/macOS-14%2B-black.svg)](#install)
 [![Swift](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 
-<img src="docs/screenshot.png" width="380" alt="The popover, with one tab per account">
+<img src="docs/screenshot.png" width="330" alt="The popover, with one tab per account"> <img src="docs/activity.png" width="330" alt="Local activity, by model" valign="top">
 
 </div>
 
@@ -46,12 +46,13 @@ at the wrong number.
 
 | | |
 |---|---|
-| **Several accounts** | Each account keeps its own OAuth tokens, in the macOS Keychain, independent of the Claude Code CLI. Sign in once per account; the menu bar shows them side by side. |
+| **Several accounts** | Each account keeps its own OAuth tokens, in the macOS Keychain, independent of the Claude Code CLI. Sign in once per account; the menu bar shows them side by side. Rename them from the tab or from Settings — the profile endpoint tends to name every account after the same person. |
 | **Every window** | Session (5 h), weekly across all models, and the per-model weekly windows — Fable, Opus, Sonnet — as the API reports them. No hard-coded list. |
 | **Countdown, not a full bar** | A saturated limit is pinned at 100 % until it rolls over. The menu bar swaps its bars for `5h 1h42` — the only number that still means anything. |
-| **History chart** | The endpoint has no history, so the app keeps its own: every poll is sampled and charted over 6 h / 24 h / 7 d / 30 d. |
-| **Tabs in the popover** | One tab per account, a coloured dot per tab so you can see a saturated account without opening it. |
-| **Notifications** | At 80 %, 95 % and when a window is spent. Once per crossing, per account, per window. |
+| **Two rhythms, two charts** | The session window turns over five times a day and the weekly ones once a week, so they do not share a scale: the session gets bars of the quota it burned per bucket, with roll-overs marked and unobserved stretches left blank; the weekly windows get a level line each. |
+| **Real history, honestly labelled** | The usage endpoint reports a level, never a curve, so a fresh install has nothing to plot. Claude Code's own transcripts do — months of it — and they are charted in their own pane: tokens per bucket, stacked by model. It sits *outside* the account tabs because the transcripts record no account. |
+| **Notifications** | At 80 %, 95 % and when a window is spent — including a window locked below 100 %. |
+| **Native on Tahoe, still runs on Sonoma** | Liquid Glass where macOS 26 offers it, a plain material where it does not. |
 | **English & French** | Follows the system language, or pick one. |
 | **Light** | No Electron, no browser, no telemetry. A universal binary of a few megabytes. |
 
@@ -91,12 +92,18 @@ and its history file; the Claude account itself is untouched.
 - **Usage** — `GET https://api.anthropic.com/api/oauth/usage`, the endpoint behind the
   official dashboard. Polled every 15 minutes by default (5 to 60, your call), backing off
   when the API asks it to.
-- **History** — the endpoint returns a point in time, not a curve. Each successful poll is
-  appended to `~/Library/Application Support/fr.mymonkey.monkeyclaudeusage/history/<account>.json`
-  and pruned to your retention window. The chart therefore **starts empty and fills in as the
-  app runs** — it cannot show you yesterday if it was not running yesterday.
+- **Quota history** — the endpoint returns a point in time, not a curve. Each successful poll
+  is appended to `~/Library/Application Support/fr.mymonkey.monkeyclaudeusage/history/<account>.json`
+  and pruned to your retention window, which is what the session bars and the weekly lines
+  are drawn from. They therefore **start empty and fill in as the app runs**.
+- **Local activity** — read from Claude Code's own transcripts under `~/.claude/projects/`,
+  which is the only history that exists before the app was installed. A first pass over a few
+  gigabytes takes about ten seconds; afterwards only files that changed are re-read, in a
+  tenth of a second. Every assistant message is written to its transcript twice, so they are
+  deduplicated by id.
 
-Nothing else is read. In particular the app never opens your Claude Code transcripts.
+The transcripts carry no account identifier — which is exactly why the activity pane says
+"every account together" rather than pinning the figure on whichever tab is open.
 
 ## Reading the menu bar
 
@@ -105,7 +112,9 @@ model-scoped window (`Fa` for Fable, `Op` for Opus…).
 
 With **several accounts**, the row labels give way to a per-account letter and the row order
 stays the same for everyone — session first, weekly next, model-scoped last. Rename accounts
-in **Settings → Accounts** to control which letter you get.
+in **Settings → Accounts** to control which letter you get. Two accounts whose names start
+with the same letter — which is what you get by default, since the profile endpoint names
+both of them after you — fall back to position numbers rather than showing `M` twice.
 
 When any window of an account is spent, that account's bars are replaced by the short code
 and the time left on the **soonest** of its spent windows: `Fa 2d` means Fable is out for two
