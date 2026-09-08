@@ -106,6 +106,9 @@ package let englishStrings: [String: String] = [
     "retention": "Keep history for",
     "days": "%d days",
     "launch_at_login": "Launch at login",
+    "check_for_updates": "Check for Updates…",
+    "automatic_updates": "Automatic updates",
+    "version": "Version %@",
     "delete_confirm": "Remove %@ from the app? Its tokens and history are deleted; the Claude account itself is untouched.",
     "remove": "Remove",
 ]
@@ -171,6 +174,9 @@ package let frenchStrings: [String: String] = [
     "retention": "Conserver l'historique",
     "days": "%d jours",
     "launch_at_login": "Lancer à l'ouverture de session",
+    "check_for_updates": "Rechercher les mises à jour…",
+    "automatic_updates": "Mises à jour automatiques",
+    "version": "Version %@",
     "delete_confirm": "Retirer %@ de l'application ? Ses jetons et son historique sont supprimés ; le compte Claude n'est pas touché.",
     "remove": "Retirer",
 ]

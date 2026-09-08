@@ -20,6 +20,14 @@ REPO="my-monkeys/monkey-claude-usage"
 TAP_REPO="my-monkeys/homebrew-tap"
 CASK_PATH="Casks/monkey-claude-usage.rb"
 DIST="$REPO_ROOT/dist"
+APP="$DIST/Monkey Claude Usage.app"
+APPCAST="$REPO_ROOT/appcast.xml"
+
+# Sparkle's keychain account holding the EdDSA private key. It is NOT the default
+# account — passing the wrong one signs with someone else's key and every client
+# rejects the update, which is why the public half is checked against the built app.
+SPARKLE_ACCOUNT="monkey-claude-usage"
+SPARKLE_BIN="$REPO_ROOT/.build/artifacts/sparkle/Sparkle/bin"
 
 DRY_RUN=false
 SKIP_NOTARIZE=false
@@ -139,8 +147,46 @@ if [[ "$SKIP_NOTARIZE" == false ]]; then
     || die "Gatekeeper did not report a notarized Developer ID signature"
 fi
 
+# ----------------------------------------------------------------- appcast
+
+[[ -x "$SPARKLE_BIN/sign_update" ]] \
+  || die "Sparkle's tools are missing from $SPARKLE_BIN — run: swift package resolve"
+
+# The build number and the public key come from the app that was actually built, not
+# from a second copy of the rules: a feed whose sparkle:version disagrees with the
+# app's CFBundleVersion either offers an update forever or never offers one.
+BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
+BUNDLED_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist")"
+SIGNING_KEY="$("$SPARKLE_BIN/generate_keys" -p --account "$SPARKLE_ACCOUNT")"
+[[ "$BUNDLED_KEY" == "$SIGNING_KEY" ]] || die \
+  "the app ships SUPublicEDKey $BUNDLED_KEY but the '$SPARKLE_ACCOUNT' keychain key is $SIGNING_KEY"
+
+info "Signing the disk image for Sparkle"
+# sign_update prints `sparkle:edSignature="…" length="…"`; -p keeps the signature alone.
+SIGNATURE="$("$SPARKLE_BIN/sign_update" -p --account "$SPARKLE_ACCOUNT" "$DMG")"
+LENGTH="$(stat -f%z "$DMG")"
+
+APPCAST_ARGS=(
+  --appcast "$APPCAST"
+  --version "$VERSION"
+  --build "$BUILD_NUMBER"
+  --url "https://github.com/$REPO/releases/download/$TAG/$(basename "$DMG")"
+  --length "$LENGTH"
+  --signature "$SIGNATURE"
+)
+
+info "Updating appcast.xml ($VERSION, build $BUILD_NUMBER)"
+if [[ "$DRY_RUN" == true ]]; then
+  skip "rewrite appcast.xml:"
+  python3 "$REPO_ROOT/scripts/update-appcast.py" --stdout "${APPCAST_ARGS[@]}" \
+    | diff -u "$APPCAST" - || true
+else
+  python3 "$REPO_ROOT/scripts/update-appcast.py" "${APPCAST_ARGS[@]}"
+fi
+
 # ---------------------------------------------------------------- git tag
 
+# Read before the appcast is committed, so that housekeeping commit stays out of them.
 PREVIOUS_TAG="$(git tag --list 'v*' --sort=-version:refname | grep -vx "$TAG" | head -n 1 || true)"
 if [[ -n "$PREVIOUS_TAG" ]]; then
   RELEASE_NOTES="$(git log --no-merges --pretty='- %s' "$PREVIOUS_TAG..HEAD")"
@@ -148,6 +194,20 @@ else
   RELEASE_NOTES="$(git log --no-merges --pretty='- %s')"
 fi
 [[ -n "$RELEASE_NOTES" ]] || RELEASE_NOTES="- $TAG"
+
+# Committed before the tag so that vX.Y.Z carries the feed that announces it. A retry
+# after a failure rebuilds the disk image, whose bytes differ, so the appcast changes
+# again — delete the tag before re-running, as the check below asks.
+if [[ "$DRY_RUN" == true ]]; then
+  skip "commit and push appcast.xml"
+elif git diff --quiet -- "$APPCAST"; then
+  info "Appcast already committed for $VERSION"
+else
+  info "Committing appcast.xml"
+  git add "$APPCAST"
+  git commit --quiet -m "chore: appcast for $VERSION"
+  git push --quiet
+fi
 
 if EXISTING_TAG_SHA="$(git rev-parse --quiet --verify "refs/tags/$TAG^{commit}")"; then
   [[ "$EXISTING_TAG_SHA" == "$(git rev-parse HEAD)" ]] \

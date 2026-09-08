@@ -68,6 +68,22 @@ notarized by Apple, so it opens without the "unidentified developer" detour.
 
 **macOS 14 Sonoma or later.** Apple silicon and Intel.
 
+### Updates
+
+The app updates itself, through [Sparkle](https://sparkle-project.org). It checks the
+[appcast](appcast.xml) served from this repository, and every release is signed with an
+EdDSA key the app carries the public half of — an update it cannot verify is refused.
+Turn the check off in **Settings**, or run it by hand from **Check for Updates…** in the
+menu bar's right-click menu.
+
+Installing through Homebrew stays perfectly fine: the cask and the built-in updater install
+the same disk image, so `brew upgrade` and the in-app update lead to the same place. Nothing
+is reported anywhere — the app asks GitHub for one XML file and that is the whole of it.
+
+Coming from **0.1.0**? That version shipped before Sparkle, so it cannot update itself. Run
+`brew upgrade --cask monkey-claude-usage` once (or install the newer `.dmg`) and it takes
+over from there.
+
 ## Adding accounts
 
 1. Click the menu bar icon → **Sign in with Claude**.
@@ -127,7 +143,7 @@ Requires macOS 14+ and Swift 6.
 ```bash
 git clone https://github.com/my-monkeys/monkey-claude-usage.git
 cd monkey-claude-usage
-swift test                 # 11 tests over the payload parsing, countdowns and history
+swift test                 # 12 tests over the payload parsing, countdowns, history and appcast
 ./scripts/build-dmg.sh     # → dist/Monkey Claude Usage.app and dist/MonkeyClaudeUsage-<v>.dmg
 ```
 
@@ -141,7 +157,7 @@ Sources/MonkeyClaudeUsageCore/   business logic and I/O — no AppKit, unit-test
   Model/       UsageLimit, UsageSnapshot, the payload decoder, countdown formatting
   Services/    OAuthClient (PKCE), Keychain, AccountMonitor, AppState, history, notifications
 Sources/MonkeyClaudeUsage/       the menu bar app
-  App/         NSStatusItem, popover, settings window
+  App/         NSStatusItem, popover, settings window, Sparkle updater
   UI/          menu bar rendering, popover, chart, settings
 ```
 
@@ -151,8 +167,9 @@ target with no UI, so it can be tested without a screen.
 ## Privacy
 
 No analytics, no crash reporting, no network call to anywhere except `claude.ai`,
-`platform.claude.com` and `api.anthropic.com`. Your tokens stay in your Keychain and your
-history stays in your Application Support folder.
+`platform.claude.com` and `api.anthropic.com` — plus `raw.githubusercontent.com` and
+`github.com` when the updater looks for a new version, which carries nothing about you.
+Your tokens stay in your Keychain and your history stays in your Application Support folder.
 
 ## Credits
 
