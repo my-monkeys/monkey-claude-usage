@@ -173,6 +173,13 @@ de modèle : au-delà de la palette, la queue est repliée sur une série « Aut
 de relever la cible de déploiement — une utilitaire de barre de menus est précisément ce qu'on
 garde sur une machine ancienne.
 
+⚠️ **`#available` ne suffit pas** : c'est un test d'exécution, le symbole doit exister à la
+compilation. Compilé contre le SDK macOS 15, `glassEffect` ne compile pas du tout — c'est ce
+qui a fait échouer la CI. D'où le `#if compiler(>=6.2)` qui l'entoure : il tient lieu de
+« construit avec Xcode 26 ou plus », de sorte qu'un contributeur sur un Xcode plus ancien
+compile le repli. Corollaire : **les binaires publiés doivent être construits avec Xcode 26+**,
+sans quoi ils sortent sans verre.
+
 ⚠️ **Le verre échantillonne la fenêtre derrière lui.** Là où il n'y a rien à échantillonner,
 l'effet ne rend **rien du tout** : un onglet devient invisible. D'où le fond plein toujours
 posé, le verre seulement par-dessus. Et `GlassEffectContainer` fait disparaître tout son
