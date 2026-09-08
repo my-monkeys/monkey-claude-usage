@@ -20,11 +20,7 @@ struct MenuBarAccount {
 
     /// A saturated limit makes its bar useless: it is pinned at 100 % until the window
     /// rolls over, so the block switches to a countdown instead.
-    var blockingLimit: UsageLimit? {
-        limits
-            .filter(\.isSaturated)
-            .min { ($0.resetsAt ?? .distantFuture) < ($1.resetsAt ?? .distantFuture) }
-    }
+    var blockingLimit: UsageLimit? { limits.firstToRelease }
 }
 
 private enum Metrics {
@@ -73,12 +69,19 @@ func renderMenuBarIcon(
         return renderPlaceholderIcon(style: style, compact: compact)
     }
 
+    // Measured once and captured: NSImage replays the drawing block later, and a
+    // countdown re-measured then can be wider than the image reserved for it.
+    let now = Date()
+
     // A single account can afford explicit row labels; several accounts need the
     // horizontal room for a per-account tag instead, and rely on a fixed row order.
     let usesRowLabels = accounts.count == 1
-    let blocks = accounts.map { blockWidth(for: $0, rows: rows, barWidth: barWidth, usesRowLabels: usesRowLabels) }
+    // A spent account shows a countdown that already carries its own label, so the
+    // shared label column would leave "5h" sitting next to "5h 1h42".
+    let showsRowLabels = usesRowLabels && accounts[0].blockingLimit == nil
+    let blocks = accounts.map { blockWidth(for: $0, barWidth: barWidth, usesRowLabels: usesRowLabels, now: now) }
     let logoWidth = showLogo ? Metrics.logoSize + Metrics.logoGap : 0
-    let leadingLabels = usesRowLabels ? Metrics.labelWidth + Metrics.innerGap : 0
+    let leadingLabels = showsRowLabels ? Metrics.labelWidth + Metrics.innerGap : 0
     let totalWidth = logoWidth + leadingLabels
         + blocks.reduce(0, +)
         + CGFloat(max(0, accounts.count - 1)) * Metrics.accountGap
@@ -94,7 +97,7 @@ func renderMenuBarIcon(
         let stackHeight = CGFloat(rows.count) * geometry.bar + CGFloat(rows.count - 1) * geometry.gap
         let top = (Metrics.height - stackHeight) / 2
 
-        if usesRowLabels {
+        if showsRowLabels {
             for (index, row) in rows.enumerated() {
                 let y = top + CGFloat(index) * (geometry.bar + geometry.gap)
                 drawLabel(row.label, x: x, y: y, width: Metrics.labelWidth, rowHeight: geometry.bar)
@@ -109,7 +112,7 @@ func renderMenuBarIcon(
             }
 
             if let blocking = account.blockingLimit {
-                drawCountdown(for: blocking, x: x)
+                drawCountdown(for: blocking, x: x, now: now)
             } else {
                 for (rowIndex, row) in rows.enumerated() {
                     let y = top + CGFloat(rowIndex) * (geometry.bar + geometry.gap)
@@ -165,19 +168,19 @@ private func rowsFor(_ accounts: [MenuBarAccount]) -> [Row] {
 
 private func blockWidth(
     for account: MenuBarAccount,
-    rows: [Row],
     barWidth: CGFloat,
-    usesRowLabels: Bool
+    usesRowLabels: Bool,
+    now: Date
 ) -> CGFloat {
     let tag = usesRowLabels ? 0 : Metrics.tagWidth + Metrics.innerGap
     if let blocking = account.blockingLimit {
-        return tag + countdownText(for: blocking).size().width
+        return tag + countdownText(for: blocking, now: now).size().width
     }
     return tag + barWidth
 }
 
-private func countdownText(for limit: UsageLimit) -> NSAttributedString {
-    let value = limit.resetsAt.map { Countdown.short(until: $0) } ?? "—"
+private func countdownText(for limit: UsageLimit, now: Date) -> NSAttributedString {
+    let value = limit.resetsAt.map { Countdown.short(until: $0, now: now) } ?? "—"
     let font = NSFont.monospacedDigitSystemFont(ofSize: Metrics.countdownFontSize, weight: .semibold)
     return NSAttributedString(
         string: "\(limit.shortLabel) \(value)",
@@ -211,8 +214,8 @@ private func drawLabel(
     string.draw(at: NSPoint(x: originX, y: y + (rowHeight - size.height) / 2))
 }
 
-private func drawCountdown(for limit: UsageLimit, x: CGFloat) {
-    let string = countdownText(for: limit)
+private func drawCountdown(for limit: UsageLimit, x: CGFloat, now: Date) {
+    let string = countdownText(for: limit, now: now)
     let size = string.size()
     string.draw(at: NSPoint(x: x, y: (Metrics.height - size.height) / 2))
 }

@@ -33,22 +33,32 @@ struct UsageChartView: View {
     let limits: [UsageLimit]
     @Binding var range: ChartRange
 
+    /// A plot this small cannot show more than a couple hundred points, and a month of
+    /// five-minute polling is several thousand.
+    private static let maximumPoints = 160
+
     private struct Point: Identifiable {
-        let id = UUID()
         let date: Date
         let series: String
         let percent: Double
+
+        /// Derived, not a fresh UUID per evaluation: `points` is a computed property, so
+        /// random ids would hand Swift Charts a brand new dataset on every redraw.
+        var id: String { "\(series)|\(date.timeIntervalSince1970)" }
     }
 
     private var points: [Point] {
         let cutoff = Date().addingTimeInterval(-range.duration)
         let names = Dictionary(uniqueKeysWithValues: limits.map { ($0.id, $0.fullLabel) })
-        return samples
-            .filter { $0.date >= cutoff }
-            .flatMap { sample in
+        let window = samples.filter { $0.date >= cutoff }
+        let stride = max(1, window.count / Self.maximumPoints)
+
+        return window
+            .enumerated()
+            .filter { $0.offset % stride == 0 || $0.offset == window.count - 1 }
+            .flatMap { _, sample in
                 sample.values.compactMap { key, value in
-                    guard let name = names[key] else { return nil }
-                    return Point(date: sample.date, series: name, percent: value)
+                    names[key].map { Point(date: sample.date, series: $0, percent: value) }
                 }
             }
             .sorted { $0.date < $1.date }

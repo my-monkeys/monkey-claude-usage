@@ -20,7 +20,7 @@ struct PopoverView: View {
 
             if !state.hasAccounts || isAddingAccount || state.pendingAuthorization != nil {
                 SignInView(state: state, isFirstAccount: !state.hasAccounts)
-                    .onChange(of: state.monitors.count) { isAddingAccount = false }
+                    .onChange(of: state.signInRevision) { isAddingAccount = false }
             } else if let monitor = state.selectedMonitor {
                 AccountUsageView(
                     monitor: monitor,

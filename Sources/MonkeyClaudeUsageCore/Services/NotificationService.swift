@@ -25,7 +25,8 @@ public final class NotificationService {
 
         for limit in snapshot.limits {
             let key = "\(account.id.uuidString)|\(limit.id)"
-            let crossed = Self.thresholds.last { limit.percent >= $0 }
+            // A window can be locked well below 100 %; that still means "you are blocked".
+            let crossed = limit.isSaturated ? 100 : Self.thresholds.last { limit.percent >= $0 }
 
             guard let crossed else {
                 lastNotified[key] = nil

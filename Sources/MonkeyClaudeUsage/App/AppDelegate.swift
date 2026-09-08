@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import MonkeyClaudeUsageCore
 import SwiftUI
 
@@ -10,8 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var settingsWindow: NSWindow?
-    private var dismissMonitor: Any?
     private var redrawTimer: Timer?
+    private var stateObservation: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let index = CommandLine.arguments.firstIndex(of: "--render-preview"),
@@ -35,6 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         notifications.requestAuthorization()
+
+        // Without this the icon would only catch up on the 20 s tick — "Refresh", removing
+        // an account and the menu bar settings would all appear to do nothing for a while.
+        stateObservation = state.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.redraw() }
+
         state.start()
         redraw()
 
@@ -65,15 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController?.view = NSHostingView(rootView: PopoverView(state: state))
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
-        dismissMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in self?.closePopover() }
-        }
     }
 
+    /// `.transient` already dismisses the popover on an outside click; a global event
+    /// monitor on top of it leaks, since AppKit's own dismissal never runs this code.
     private func closePopover() {
         popover.performClose(nil)
-        if let dismissMonitor { NSEvent.removeMonitor(dismissMonitor) }
-        dismissMonitor = nil
     }
 
     private func showContextMenu() {

@@ -96,6 +96,32 @@ struct UsagePayloadTests {
         let limit = UsageLimit(kind: "session", percent: 12, lockedReason: "policy")
         #expect(limit.isSaturated)
     }
+
+    @Test("two model windows stay distinct when only the model id is given")
+    func identityFallsBackToModelID() throws {
+        let json = """
+        {"limits": [
+          {"kind": "weekly_scoped", "group": "weekly", "percent": 10,
+           "scope": {"model": {"id": "claude-opus-4-6", "display_name": null}}},
+          {"kind": "weekly_scoped", "group": "weekly", "percent": 20,
+           "scope": {"model": {"id": "claude-sonnet-5", "display_name": null}}}
+        ]}
+        """
+        let snapshot = try decode(json)
+        // Sharing an id would collapse them into one chart series, one menu bar row, and
+        // one surviving entry in the history file.
+        #expect(Set(snapshot.limits.map(\.id)).count == 2)
+    }
+
+    @Test("a spent window with no reset date loses to one that has a date")
+    func releaseOrderPrefersKnownResets() {
+        let dated = UsageLimit(kind: "weekly_all", percent: 100,
+                               resetsAt: Date().addingTimeInterval(86_400))
+        let undated = UsageLimit(kind: "session", percent: 100)
+        #expect([undated, dated].firstToRelease?.kind == "weekly_all")
+        #expect([undated].firstToRelease?.kind == "session")
+        #expect([UsageLimit(kind: "session", percent: 40)].firstToRelease == nil)
+    }
 }
 
 @Suite("Countdown")

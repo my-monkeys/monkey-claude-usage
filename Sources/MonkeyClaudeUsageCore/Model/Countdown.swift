@@ -22,7 +22,14 @@ public enum Countdown {
     }
 
     public static func long(until date: Date, now: Date = Date()) -> String {
-        let seconds = max(0, date.timeIntervalSince(now))
+        duration(max(0, date.timeIntervalSince(now)))
+    }
+
+    public static func elapsed(since date: Date, now: Date = Date()) -> String {
+        duration(max(0, now.timeIntervalSince(date)))
+    }
+
+    private static func duration(_ seconds: TimeInterval) -> String {
         let french = AppLanguage.resolved == .fr
 
         if seconds >= 86_400 {
@@ -38,11 +45,5 @@ public enum Countdown {
         }
         if seconds >= 60 { return "\(Int(seconds / 60)) min" }
         return french ? "moins d'une minute" : "less than a minute"
-    }
-
-    public static func elapsed(since date: Date, now: Date = Date()) -> String {
-        let seconds = max(0, now.timeIntervalSince(date))
-        if seconds < 60 { return AppLanguage.resolved == .fr ? "quelques secondes" : "a few seconds" }
-        return long(until: now.addingTimeInterval(seconds), now: now)
     }
 }

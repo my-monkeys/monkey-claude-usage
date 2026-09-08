@@ -28,6 +28,7 @@ enum PreviewRenderer {
 
         let cases: [(String, NSImage)] = [
             ("menubar-single", renderMenuBarIcon(accounts: [first], style: .bars, compact: false)),
+            ("menubar-single-spent", renderMenuBarIcon(accounts: [secondSpent], style: .bars, compact: false)),
             ("menubar-single-logo", renderMenuBarIcon(accounts: [first], style: .both, compact: false)),
             ("menubar-two", renderMenuBarIcon(accounts: [first, MenuBarAccount(tag: "P", limits: [session, weekly, fable])],
                                               style: .bars, compact: false)),

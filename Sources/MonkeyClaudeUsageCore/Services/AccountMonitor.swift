@@ -17,7 +17,6 @@ public final class AccountMonitor: ObservableObject, Identifiable {
     @Published public private(set) var snapshot: UsageSnapshot?
     @Published public private(set) var history: [UsageSample] = []
     @Published public private(set) var state: State = .ready
-    @Published public private(set) var isRefreshing = false
     @Published public private(set) var lastUpdated: Date?
 
     public let accountID: UUID
@@ -26,6 +25,10 @@ public final class AccountMonitor: ObservableObject, Identifiable {
     private let keychain: Keychain
     private let historyStore: UsageHistoryStore
     private var backoffUntil: Date?
+    private var isRefreshing = false
+    /// A refresh suspended on the network resumes *after* `forget()`, and would happily
+    /// write a fresh token back for an account the user has removed.
+    private var isForgotten = false
 
     public init(
         account: Account,
@@ -77,14 +80,15 @@ public final class AccountMonitor: ObservableObject, Identifiable {
         isRefreshing = true
         defer { isRefreshing = false }
 
-        guard let token = await validAccessToken() else { return }
+        guard var token = await validAccessToken() else { return }
 
         do {
             var result = try await client.fetchUsage(token: token)
 
             if result.statusCode == 401 {
                 guard let renewed = await forceRefreshToken() else { return }
-                result = try await client.fetchUsage(token: renewed)
+                token = renewed
+                result = try await client.fetchUsage(token: token)
                 if result.statusCode == 401 {
                     state = .expired
                     return
@@ -101,6 +105,8 @@ public final class AccountMonitor: ObservableObject, Identifiable {
                 state = .failing("HTTP \(result.statusCode)")
                 return
             }
+
+            guard !isForgotten else { return }
 
             let payload = try JSONDecoder().decode(UsagePayload.self, from: result.data)
             let fresh = payload.snapshot()
@@ -120,9 +126,11 @@ public final class AccountMonitor: ObservableObject, Identifiable {
         }
     }
 
-    public func forget() async {
+    /// Synchronous flag first: everything after this point must refuse to write.
+    public func forget() {
+        isForgotten = true
         keychain.delete(accountID)
-        await historyStore.delete(accountID)
+        Task { [historyStore, accountID] in await historyStore.delete(accountID) }
     }
 
     // MARK: - Token plumbing
@@ -144,6 +152,7 @@ public final class AccountMonitor: ObservableObject, Identifiable {
         }
         do {
             let renewed = try await client.refresh(credentials)
+            guard !isForgotten else { return nil }
             try keychain.save(renewed, for: accountID)
             return renewed.accessToken
         } catch let error as OAuthError where error.isPermanent {
@@ -156,10 +165,10 @@ public final class AccountMonitor: ObservableObject, Identifiable {
     }
 
     private func fetchProfile(token: String) async {
-        guard let profile = try? await client.fetchProfile(token: token) ?? nil else { return }
-        account.remoteID = profile.remoteID
-        account.email = profile.email
-        account.plan = profile.planLabel
+        guard let profile = try? await client.fetchProfile(token: token) else { return }
+        account.remoteID = profile.remoteID ?? account.remoteID
+        account.email = profile.email ?? account.email
+        account.plan = profile.planLabel ?? account.plan
         if account.label.isEmpty {
             account.label = profile.name ?? profile.email ?? account.label
         }

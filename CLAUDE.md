@@ -55,6 +55,14 @@ La réponse porte `account.uuid`, stable, sur lequel se fait la déduplication ;
 n'est qu'un repli, il peut changer. Elle porte aussi `organization.rate_limit_tier`
 (`default_claude_max_20x` → « Max 20× »), affiché à côté du compte.
 
+## ⚠️ Ne pas « importer » la session de Claude Code
+
+Tentant, et écarté sciemment : le CLI garde ses jetons dans l'item de trousseau
+`Claude Code-credentials`, qu'on saurait lire. Mais **le jeton de rafraîchissement serait
+alors partagé entre deux propriétaires** : au premier renouvellement, celui qui ne l'a pas
+fait se retrouve avec un jeton périmé. Concrètement, l'app peut **déconnecter `claude`**,
+ou l'inverse, sans que l'utilisateur fasse le lien. S'en tenir à un flux OAuth par compte.
+
 ## Rendu de la barre de menus
 
 `MenuBarIcon.swift` dessine une `NSImage` en `isTemplate = true` (donc monochrome, macOS

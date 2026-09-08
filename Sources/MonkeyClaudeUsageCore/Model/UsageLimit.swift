@@ -13,6 +13,9 @@ public struct UsageLimit: Codable, Sendable, Equatable, Identifiable {
     public let severity: String?
     public let resetsAt: Date?
     public let modelName: String?
+    /// Kept even though the UI shows `modelName`: the API nulls one of the two, and two
+    /// windows that both arrive without a display name would otherwise share an id.
+    public let modelID: String?
     public let surfaceName: String?
     public let isActive: Bool
     public let lockedReason: String?
@@ -24,6 +27,7 @@ public struct UsageLimit: Codable, Sendable, Equatable, Identifiable {
         severity: String? = nil,
         resetsAt: Date? = nil,
         modelName: String? = nil,
+        modelID: String? = nil,
         surfaceName: String? = nil,
         isActive: Bool = false,
         lockedReason: String? = nil
@@ -34,6 +38,7 @@ public struct UsageLimit: Codable, Sendable, Equatable, Identifiable {
         self.severity = severity
         self.resetsAt = resetsAt
         self.modelName = modelName
+        self.modelID = modelID
         self.surfaceName = surfaceName
         self.isActive = isActive
         self.lockedReason = lockedReason
@@ -41,7 +46,7 @@ public struct UsageLimit: Codable, Sendable, Equatable, Identifiable {
 
     /// Stable across polls, so history series and menu bar rows keep their identity.
     public var id: String {
-        [kind, modelName ?? "", surfaceName ?? ""].joined(separator: "|")
+        [kind, modelName ?? modelID ?? "", surfaceName ?? ""].joined(separator: "|")
     }
 
     public var fraction: Double { max(0, min(1, percent / 100)) }
@@ -83,12 +88,19 @@ public struct UsageSnapshot: Sendable, Equatable {
 
     public var saturatedLimits: [UsageLimit] { limits.filter(\.isSaturated) }
 
-    /// The saturated limit that frees up first — what the menu bar counts down to.
-    public var nextRelease: UsageLimit? {
-        saturatedLimits
+    public var nextRelease: UsageLimit? { limits.firstToRelease }
+}
+
+extension Collection where Element == UsageLimit {
+    /// The spent window that frees up first — what the menu bar counts down to. A window
+    /// with no reset date loses to one that has a date, and only wins if nothing else is
+    /// spent.
+    public var firstToRelease: UsageLimit? {
+        let spent = filter(\.isSaturated)
+        return spent
             .filter { $0.resetsAt != nil }
             .min { ($0.resetsAt ?? .distantFuture) < ($1.resetsAt ?? .distantFuture) }
-            ?? saturatedLimits.first
+            ?? spent.first
     }
 }
 

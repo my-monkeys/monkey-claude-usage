@@ -82,6 +82,7 @@ struct UsagePayload: Decodable {
                     severity: entry.severity,
                     resetsAt: ISO8601.date(from: entry.resetsAt),
                     modelName: entry.scope?.model?.displayName,
+                    modelID: entry.scope?.model?.id,
                     surfaceName: entry.scope?.surface?.displayName,
                     isActive: entry.isActive ?? false,
                     lockedReason: entry.lockedReason

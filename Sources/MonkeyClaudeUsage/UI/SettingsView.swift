@@ -118,5 +118,8 @@ private struct AccountRow: View {
         }
         .padding(.vertical, 3)
         .onAppear { label = monitor.account.label }
+        // The label arrives with the profile, often after this row is on screen; without
+        // this, submitting the field would write the stale placeholder back.
+        .onChange(of: monitor.account.label) { _, new in label = new }
     }
 }

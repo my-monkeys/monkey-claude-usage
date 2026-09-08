@@ -21,33 +21,12 @@ struct SignInView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if state.canImportClaudeCodeSession {
-                    Button(L("import_cli")) {
-                        Task { await state.importClaudeCodeSession() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
-
-                    Text(L("or"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity)
-                }
-
-                // Importing is the shortcut; the browser flow stays available and is the
-                // only way in for a second account.
-                let browserFlow = Button(L("sign_in")) {
+                Button(L("sign_in")) {
                     NSWorkspace.shared.open(state.beginSignIn())
                 }
+                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
-
-                if state.canImportClaudeCodeSession {
-                    browserFlow.buttonStyle(.bordered)
-                } else {
-                    browserFlow.buttonStyle(.borderedProminent)
-                }
             } else {
                 Text(L("sign_in_hint"))
                     .font(.system(size: 11))

@@ -12,6 +12,10 @@ public final class AppState: ObservableObject {
     @Published public private(set) var pendingAuthorization: OAuthClient.PendingAuthorization?
     @Published public private(set) var isExchangingCode = false
     @Published public private(set) var authorizationError: String?
+    /// Bumped whenever a sign-in finishes, added account or not — re-authorizing an
+    /// existing account leaves `monitors.count` untouched, so the popover would stay
+    /// stuck on its sign-in screen if it watched the count.
+    @Published public private(set) var signInRevision = 0
     @Published public var pollingMinutes: Int {
         didSet {
             UserDefaults.standard.set(pollingMinutes, forKey: PreferenceKey.pollingMinutes)
@@ -24,7 +28,7 @@ public final class AppState: ObservableObject {
     private let historyStore: UsageHistoryStore
     private let defaults: UserDefaults
     private var timer: Timer?
-    private var cancellables: Set<AnyCancellable> = []
+    private var observations: [UUID: AnyCancellable] = [:]
 
     public init(
         client: OAuthClient = OAuthClient(),
@@ -112,9 +116,8 @@ public final class AppState: ObservableObject {
             // that account's tokens in place instead of opening a duplicate tab.
             if let existing = existingMonitor(matching: profile) {
                 try keychain.save(credentials, for: existing.id)
-                pendingAuthorization = nil
+                finishSignIn(selecting: existing.id)
                 await existing.refresh(force: true)
-                select(existing.id)
                 return
             }
 
@@ -134,8 +137,7 @@ public final class AppState: ObservableObject {
             monitors.append(monitor)
             observe(monitor)
             persistAccounts()
-            pendingAuthorization = nil
-            select(account.id)
+            finishSignIn(selecting: account.id)
             await monitor.refresh(force: true)
             persistAccounts()
         } catch {
@@ -143,68 +145,32 @@ public final class AppState: ObservableObject {
         }
     }
 
+    /// Both criteria are tried, not one or the other: an account added while the profile
+    /// endpoint was down has no `remoteID`, and matching on the new profile's id alone
+    /// would then create a second tab for the same Claude account.
     private func existingMonitor(matching profile: AccountProfile?) -> AccountMonitor? {
         guard let profile else { return nil }
-        if let remoteID = profile.remoteID {
-            return monitors.first { $0.account.remoteID == remoteID }
+        return monitors.first { monitor in
+            if let remoteID = profile.remoteID, monitor.account.remoteID == remoteID { return true }
+            if let email = profile.email, monitor.account.email == email { return true }
+            return false
         }
-        guard let email = profile.email else { return nil }
-        return monitors.first { $0.account.email == email }
     }
 
-    /// Adopts the CLI's session as a new account. Returns false when there is nothing
-    /// to import or when it turns out to be an account already present.
-    @discardableResult
-    public func importClaudeCodeSession() async -> Bool {
-        guard let credentials = ClaudeCodeSession.read() else {
-            authorizationError = L("import_failed")
-            return false
-        }
-
-        let profile = try? await client.fetchProfile(token: credentials.accessToken)
-        if let existing = existingMonitor(matching: profile) {
-            try? keychain.save(credentials, for: existing.id)
-            await existing.refresh(force: true)
-            select(existing.id)
-            return false
-        }
-
-        let account = Account(
-            label: profile?.name ?? profile?.email ?? defaultLabel(),
-            email: profile?.email,
-            remoteID: profile?.remoteID,
-            plan: profile?.planLabel
-        )
-        do {
-            try keychain.save(credentials, for: account.id)
-        } catch {
-            authorizationError = error.localizedDescription
-            return false
-        }
-
-        let monitor = AccountMonitor(
-            account: account,
-            client: client,
-            keychain: keychain,
-            historyStore: historyStore
-        )
-        monitors.append(monitor)
-        observe(monitor)
-        persistAccounts()
-        select(account.id)
-        await monitor.refresh(force: true)
-        persistAccounts()
-        return true
+    private func finishSignIn(selecting accountID: UUID) {
+        pendingAuthorization = nil
+        authorizationError = nil
+        select(accountID)
+        signInRevision += 1
     }
-
-    public var canImportClaudeCodeSession: Bool { ClaudeCodeSession.isAvailable }
 
     // MARK: - Account management
 
     public func remove(_ accountID: UUID) {
         guard let index = monitors.firstIndex(where: { $0.id == accountID }) else { return }
         let monitor = monitors.remove(at: index)
-        Task { await monitor.forget() }
+        monitor.forget()
+        observations[accountID] = nil
         persistAccounts()
         if selectedAccountID == accountID {
             selectedAccountID = monitors.first?.id
@@ -248,13 +214,12 @@ public final class AppState: ObservableObject {
     /// the first poll — mirror that back into preferences, and republish so the menu
     /// bar redraws when any monitor changes.
     private func observe(_ monitor: AccountMonitor) {
-        monitor.objectWillChange
+        observations[monitor.id] = monitor.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
                 self?.persistAccounts()
             }
-            .store(in: &cancellables)
     }
 
     private func defaultLabel() -> String {
