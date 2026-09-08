@@ -45,7 +45,7 @@ public enum PreferenceKey {
     public static let activityMeasure = "activityMeasure"
 }
 
-let englishStrings: [String: String] = [
+package let englishStrings: [String: String] = [
     "app_name": "Monkey Claude Usage",
     "accounts": "Accounts",
     "add_account": "Add an account",
@@ -109,7 +109,7 @@ let englishStrings: [String: String] = [
     "remove": "Remove",
 ]
 
-let frenchStrings: [String: String] = [
+package let frenchStrings: [String: String] = [
     "app_name": "Monkey Claude Usage",
     "accounts": "Comptes",
     "add_account": "Ajouter un compte",
