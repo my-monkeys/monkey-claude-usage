@@ -42,6 +42,7 @@ public final class ActivityModel: ObservableObject {
         }
     }
 
+    /// Models this Mac has actually used, heaviest first.
     public var models: [String] {
         var totals: [String: Int] = [:]
         for slot in slots {

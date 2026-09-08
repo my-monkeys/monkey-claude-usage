@@ -18,7 +18,12 @@ enum Theme {
     /// Series colours follow the window order — session, weekly, then per-model — so a
     /// line keeps its colour from one account to the next instead of being assigned
     /// alphabetically by Swift Charts.
-    static let seriesPalette: [Color] = [.accentColor, .teal, .orange, .purple, .pink]
+    static let seriesPalette: [Color] = [.accentColor, .teal, .orange, .purple, .pink, .green]
+
+    /// Everything past the palette is lumped together under one neutral, so the chart's
+    /// colour domain and range always have the same size — mismatched, Swift Charts
+    /// silently gives two series the same colour.
+    static let overflowSeriesColor: Color = .gray
 }
 
 extension Text {

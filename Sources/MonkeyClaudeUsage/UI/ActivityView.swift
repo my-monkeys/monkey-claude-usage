@@ -12,6 +12,29 @@ struct ActivityView: View {
     @Binding var range: ChartRange
     @Binding var measure: ActivityMeasure
 
+    /// Six colours in the palette, and this Mac has already run more model versions than
+    /// that; the tail is folded into one series so the chart's domain matches its range.
+    private var series: [String] {
+        let named = Array(model.models.prefix(Theme.seriesPalette.count))
+        return model.models.count > named.count ? named + [Self.otherSeries] : named
+    }
+
+    private static let otherSeries = "\u{0000}other"
+
+    private func seriesName(for identifier: String) -> String {
+        series.contains(identifier) ? identifier : Self.otherSeries
+    }
+
+    private func palette(for count: Int) -> [Color] {
+        var colours = Array(Theme.seriesPalette.prefix(count))
+        if series.last == Self.otherSeries { colours[count - 1] = Theme.overflowSeriesColor }
+        return colours
+    }
+
+    private func label(for identifier: String) -> String {
+        identifier == Self.otherSeries ? L("other_models") : Self.shortModelName(identifier)
+    }
+
     private struct Bar: Identifiable {
         let start: Date
         let model: String
@@ -86,26 +109,24 @@ struct ActivityView: View {
             if data.isEmpty {
                 note(L("no_activity_in_range"))
             } else {
-                let width = window.bucket
                 Chart(data) { bar in
-                    // Models stack legitimately here: unlike quota percentages, tokens add up.
+                    // Models stack legitimately here: unlike quota percentages, tokens add
+                    // up. Stacking only happens with the `x:y:` initializer — the range
+                    // form draws horizontal slabs and never stacks.
                     BarMark(
-                        xStart: .value("from", bar.start),
-                        xEnd: .value("to", bar.start.addingTimeInterval(width * 0.78)),
-                        y: .value("tokens", bar.tokens)
+                        x: .value("t", bar.start),
+                        y: .value("tokens", bar.tokens),
+                        width: .fixed(barWidth)
                     )
                     .foregroundStyle(by: .value("m", bar.model))
                     .cornerRadius(1)
                 }
-                .chartForegroundStyleScale(
-                    domain: model.models,
-                    range: Array(Theme.seriesPalette.prefix(max(1, model.models.count)))
-                )
+                .chartForegroundStyleScale(domain: series, range: palette(for: series.count))
                 .chartLegend(.hidden)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { mark in
                         AxisGridLine().foregroundStyle(Color.primary.opacity(0.08))
-                        AxisValueLabel {
+                        AxisValueLabel(horizontalSpacing: 6) {
                             Text(Self.compact(mark.as(Int.self) ?? 0)).font(.system(size: 9))
                         }
                     }
@@ -124,12 +145,12 @@ struct ActivityView: View {
     private var legend: some View {
         let totals = modelTotals
         return FlowRow(spacing: 10) {
-            ForEach(Array(model.models.prefix(Theme.seriesPalette.count).enumerated()), id: \.element) { index, name in
+            ForEach(Array(series.enumerated()), id: \.element) { index, name in
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Theme.seriesPalette[index % Theme.seriesPalette.count])
+                        .fill(palette(for: series.count)[index])
                         .frame(width: 6, height: 6)
-                    Text(Self.shortModelName(name))
+                    Text(label(for: name))
                         .font(.system(size: 10))
                     Text(Self.compact(totals[name] ?? 0))
                         .numeric()
@@ -167,7 +188,7 @@ struct ActivityView: View {
         return model.slots
             .buckets(width: bucket, since: start, until: end, measure: measure)
             .flatMap { slot in
-                slot.byModel.map { Bar(start: slot.start, model: $0.key, tokens: $0.value) }
+                slot.byModel.map { Bar(start: slot.start, model: seriesName(for: $0.key), tokens: $0.value) }
             }
     }
 
@@ -176,6 +197,14 @@ struct ActivityView: View {
     }
 
     private var total: Int { modelTotals.values.reduce(0, +) }
+
+    /// Swift Charts sizes a categorical band on its own, but a time axis has no bands:
+    /// without an explicit width every bar collapses to a hairline.
+    private var barWidth: CGFloat {
+        let (start, end, bucket) = window
+        let count = max(1, end.timeIntervalSince(start) / bucket)
+        return max(2, min(22, 268 / count))
+    }
 
     private var axisFormat: Date.FormatStyle {
         switch range {

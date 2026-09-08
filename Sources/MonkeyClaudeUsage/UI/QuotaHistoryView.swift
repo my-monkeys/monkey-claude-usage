@@ -98,13 +98,15 @@ struct QuotaHistoryView: View {
                     }
 
                     ForEach(series.buckets) { bucket in
-                        // Spanning start→end rather than a point with a unit: a bucket is
-                        // fifteen minutes wide, which is not a calendar unit, and a
-                        // `unit: .second` bar comes out one second wide — invisible.
-                        BarMark(
+                        // RectangleMark, not BarMark: a bucket is fifteen minutes wide,
+                        // which is not a calendar unit, and no `BarMark` initializer takes
+                        // a plottable range on *both* axes — `xStart:xEnd:y:` is the
+                        // horizontal-bar form and draws a floating slab, not a column.
+                        RectangleMark(
                             xStart: .value("from", bucket.start),
                             xEnd: .value("to", bucket.start.addingTimeInterval(series.bucketWidth * 0.78)),
-                            y: .value("pts", bucket.points)
+                            yStart: .value("zero", 0),
+                            yEnd: .value("pts", bucket.points)
                         )
                         .foregroundStyle(Theme.tint(for: limit.percent))
                         .cornerRadius(1.5)
