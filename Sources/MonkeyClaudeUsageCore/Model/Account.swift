@@ -10,19 +10,24 @@ public struct Account: Codable, Sendable, Equatable, Identifiable, Hashable {
     /// as being the same Claude account rather than a new one.
     public var remoteID: String?
     public var plan: String?
+    /// Set the moment the user renames the account, so a later profile fetch never
+    /// overwrites their choice — and so the placeholder given at creation can be.
+    public var hasCustomLabel = false
 
     public init(
         id: UUID = UUID(),
         label: String,
         email: String? = nil,
         remoteID: String? = nil,
-        plan: String? = nil
+        plan: String? = nil,
+        hasCustomLabel: Bool = false
     ) {
         self.id = id
         self.label = label
         self.email = email
         self.remoteID = remoteID
         self.plan = plan
+        self.hasCustomLabel = hasCustomLabel
     }
 
     /// Shown in the popover tabs.

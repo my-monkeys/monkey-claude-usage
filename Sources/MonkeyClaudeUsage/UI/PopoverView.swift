@@ -3,7 +3,10 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var state: AppState
-    @StateObject private var activity = ActivityModel()
+    /// Owned by the AppDelegate, not created here: the popover's hosting view is rebuilt
+    /// on every opening, and a fresh model each time would rescan a couple of gigabytes
+    /// and race the previous scan for the same cache file.
+    @ObservedObject var activity: ActivityModel
     @AppStorage(PreferenceKey.chartRange) private var storedRange = ChartRange.sixHours.rawValue
     @AppStorage(PreferenceKey.activityRange) private var storedActivityRange = ChartRange.week.rawValue
     @AppStorage(PreferenceKey.activityMeasure) private var storedMeasure = ActivityMeasure.allTokens.rawValue
@@ -26,7 +29,10 @@ struct PopoverView: View {
 
             if !state.hasAccounts || isAddingAccount || state.pendingAuthorization != nil {
                 SignInView(state: state, isFirstAccount: !state.hasAccounts)
-                    .onChange(of: state.signInRevision) { isAddingAccount = false }
+                    .onChange(of: state.signInRevision) {
+                        isAddingAccount = false
+                        showsActivity = false
+                    }
             } else if showsActivity {
                 ActivityView(model: activity, range: activityRange, measure: measure)
             } else if let monitor = state.selectedMonitor {
@@ -46,6 +52,7 @@ struct PopoverView: View {
         .onReceive(clock) { now = $0 }
         .onReceive(NotificationCenter.default.publisher(for: .openSignIn)) { _ in
             isAddingAccount = true
+            showsActivity = false
         }
         .alert(L("rename_account"), isPresented: Binding(
             get: { accountBeingRenamed != nil },
@@ -78,8 +85,11 @@ struct PopoverView: View {
         }
     }
 
+    /// Matches what the menu bar does — it falls back to numbers on a *first letter*
+    /// collision, so the tab has to show that number in exactly the same cases.
     private func isAmbiguous(_ monitor: AccountMonitor) -> Bool {
-        state.monitors.filter { $0.account.displayName == monitor.account.displayName }.count > 1
+        let initials = state.monitors.map(\.account.initial)
+        return Set(initials).count != initials.count
     }
 
     private var chartRange: Binding<ChartRange> {
@@ -161,7 +171,6 @@ struct PopoverView: View {
             // machine, not to an account.
             Button {
                 showsActivity.toggle()
-                isAddingAccount = false
             } label: {
                 Image(systemName: "chart.bar")
                     .font(.system(size: 11, weight: showsActivity ? .semibold : .regular))
@@ -171,6 +180,9 @@ struct PopoverView: View {
             }
             .buttonStyle(.plain)
             .help(L("activity"))
+            // A half-finished sign-in owns the pane; letting the chip take it over would
+            // discard the pending authorization without saying so.
+            .disabled(isAddingAccount || state.pendingAuthorization != nil)
         }
     }
 

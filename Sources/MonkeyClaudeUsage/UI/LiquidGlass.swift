@@ -6,26 +6,9 @@ import SwiftUI
 /// rather than by raising the deployment target — a menu bar utility is exactly the kind
 /// of thing people keep on an older machine.
 extension View {
-    /// Glass surface for a panel: the popover body, a settings card.
-    func glassPanel(cornerRadius: CGFloat = 14) -> some View {
-        modifier(GlassPanel(cornerRadius: cornerRadius))
-    }
-
     /// Glass for a small interactive chip — a tab, a toggle.
     func glassChip(cornerRadius: CGFloat = 7, isProminent: Bool = false) -> some View {
         modifier(GlassChip(cornerRadius: cornerRadius, isProminent: isProminent))
-    }
-}
-
-private struct GlassPanel: ViewModifier {
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-        }
     }
 }
 
@@ -49,21 +32,6 @@ private struct GlassChip: ViewModifier {
             filled.glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
         } else {
             filled
-        }
-    }
-}
-
-/// Groups nearby glass surfaces so they sample one background and blend into each other
-/// instead of each carrying its own edge.
-struct GlassGroup<Content: View>: View {
-    var spacing: CGFloat = 8
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        if #available(macOS 26, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
-            content
         }
     }
 }

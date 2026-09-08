@@ -120,6 +120,7 @@ struct QuotaHistoryView: View {
                             .foregroundStyle(Color.primary.opacity(0.25))
                     }
                 }
+                .chartXScale(domain: series.start...series.end)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 2)) { mark in
                         AxisGridLine().foregroundStyle(Color.primary.opacity(0.08))

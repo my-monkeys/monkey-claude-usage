@@ -152,7 +152,7 @@ enum PreviewRenderer {
         // Rendered inside a real window: ImageRenderer draws buttons and pickers as
         // placeholder blocks, and a detached NSHostingView drops text altogether.
         let hosting = NSHostingView(rootView:
-            PopoverView(state: state).background(Color(nsColor: .windowBackgroundColor))
+            PopoverView(state: state, activity: ActivityModel()).background(Color(nsColor: .windowBackgroundColor))
         )
         hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
 

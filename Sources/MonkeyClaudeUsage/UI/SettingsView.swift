@@ -89,8 +89,10 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 8) {
+                // Only asks the popover to show its sign-in pane. Starting the browser
+                // flow here would leave the pasted-back code with nowhere to go: the field
+                // that receives it lives in the popover.
                 Button {
-                    NSWorkspace.shared.open(state.beginSignIn())
                     NotificationCenter.default.post(name: .openSignIn, object: nil)
                 } label: {
                     Label(L("add_account"), systemImage: "plus")

@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = AppState()
+    private let activity = ActivityModel()
     private let notifications = NotificationService()
 
     // Built after the `--render-preview` early exit: that path never gets an event loop,
@@ -35,10 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover.behavior = .transient
         popover.contentViewController = NSViewController()
-        popover.contentViewController?.view = NSHostingView(rootView: PopoverView(state: state))
+        popover.contentViewController?.view = NSHostingView(rootView: PopoverView(state: state, activity: activity))
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(openSettings), name: .openSettings, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showPopoverForSignIn), name: .openSignIn, object: nil
         )
 
         notifications.requestAuthorization()
@@ -76,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             closePopover()
             return
         }
-        popover.contentViewController?.view = NSHostingView(rootView: PopoverView(state: state))
+        popover.contentViewController?.view = NSHostingView(rootView: PopoverView(state: state, activity: activity))
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -115,6 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Actions
+
+    /// Settings asked for an account to be added; the sign-in pane is in the popover.
+    @objc private func showPopoverForSignIn() {
+        guard !popover.isShown else { return }
+        togglePopover()
+    }
 
     @objc private func refreshNow() {
         Task { await state.refreshAll(force: true) }

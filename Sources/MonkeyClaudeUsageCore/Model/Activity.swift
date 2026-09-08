@@ -81,7 +81,12 @@ extension Collection where Element == ActivitySlot {
         measure: ActivityMeasure,
         calendar: Calendar = .current
     ) -> [ActivityBucket] {
-        let origin = floor(since.timeIntervalSince1970 / width) * width
+        // Aligned on the local clock, not on the epoch. A multiple of 86 400 seconds is
+        // midnight UTC, so a "day" bar would start at 02:00 in Paris while the axis
+        // labels it in local time — tokens burned before 02:00 would land on the wrong
+        // day. The same applies to hourly bars in the half-hour offset zones.
+        let offset = TimeInterval(calendar.timeZone.secondsFromGMT(for: since))
+        let origin = floor((since.timeIntervalSince1970 + offset) / width) * width - offset
         var totals: [Int: [String: Int]] = [:]
 
         for slot in self where slot.start >= since && slot.start < until {

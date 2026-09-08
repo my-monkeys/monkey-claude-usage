@@ -23,6 +23,10 @@ struct ConsumptionSeries {
     let gaps: [Gap]
     let resets: [Date]
     let bucketWidth: TimeInterval
+    /// The domain the chart should pin itself to — marks alone would let the first bucket
+    /// start before the range and the last one run past now.
+    let start: Date
+    let end: Date
 
     var isEmpty: Bool { buckets.allSatisfy { $0.points == 0 } }
 
@@ -30,28 +34,47 @@ struct ConsumptionSeries {
         bucketWidth >= 3600 ? L("bucket_hour") : L("bucket_15min")
     }
 
-    init(samples: [UsageSample], limitID: String, range: ChartRange, pollingMinutes: Int) {
-        let width: TimeInterval = range == .sixHours ? 900 : 3600
-        let end = Date()
+    init(
+        samples: [UsageSample],
+        limitID: String,
+        range: ChartRange,
+        pollingMinutes: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        let end = now
         let start = end.addingTimeInterval(-range.duration)
-        let origin = floor(start.timeIntervalSince1970 / width) * width
-
-        // Two missed polls in a row is a gap; one late poll is just a late poll.
-        let tolerance = TimeInterval(pollingMinutes * 60) * 2.5
 
         let readings = samples
             .compactMap { sample -> (Date, Double)? in
                 guard let value = sample.values[limitID] else { return nil }
                 return (sample.date, value)
             }
-            .filter { $0.0 >= start.addingTimeInterval(-tolerance) }
             .sorted { $0.0 < $1.0 }
+
+        // Measured from the readings rather than taken from the current setting: someone
+        // who polled every hour last week and every five minutes today would otherwise
+        // see all of last week condemned as one long gap.
+        let cadence = Self.cadence(of: readings, fallback: TimeInterval(pollingMinutes * 60))
+
+        // A bucket finer than the cadence would put every reading in its own bucket and
+        // leave the ones between empty, which reads as an idle period rather than as a
+        // resolution the data cannot support.
+        let width = max(range == .sixHours ? 900 : 3600, cadence)
+
+        let offset = TimeInterval(calendar.timeZone.secondsFromGMT(for: start))
+        let origin = floor((start.timeIntervalSince1970 + offset) / width) * width - offset
+
+        // Two missed polls in a row is a gap; one late poll is just a late poll.
+        let tolerance = cadence * 2.5
 
         var totals: [Int: Double] = [:]
         var gaps: [Gap] = []
         var resets: [Date] = []
 
-        for (previous, current) in zip(readings, readings.dropFirst()) {
+        let window = readings.filter { $0.0 >= start.addingTimeInterval(-tolerance) }
+
+        for (previous, current) in zip(window, window.dropFirst()) {
             let interval = current.0.timeIntervalSince(previous.0)
             guard interval <= tolerance else {
                 gaps.append(Gap(start: previous.0, end: current.0))
@@ -81,6 +104,19 @@ struct ConsumptionSeries {
         self.gaps = gaps
         self.resets = resets
         self.bucketWidth = width
+        self.start = Date(timeIntervalSince1970: origin)
+        self.end = end
+    }
+
+    /// Median interval between readings — robust to the one long gap a sleeping Mac
+    /// leaves behind, which a mean is not.
+    private static func cadence(of readings: [(Date, Double)], fallback: TimeInterval) -> TimeInterval {
+        let intervals = zip(readings, readings.dropFirst())
+            .map { $1.0.timeIntervalSince($0.0) }
+            .filter { $0 > 0 }
+            .sorted()
+        guard !intervals.isEmpty else { return fallback }
+        return intervals[intervals.count / 2]
     }
 }
 

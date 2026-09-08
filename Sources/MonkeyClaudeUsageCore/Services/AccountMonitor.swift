@@ -71,6 +71,7 @@ public final class AccountMonitor: ObservableObject, Identifiable {
 
     public func rename(_ label: String) {
         account.label = label
+        account.hasCustomLabel = true
     }
 
     /// - Parameter force: ignore the rate-limit backoff (user tapped refresh).
@@ -169,8 +170,10 @@ public final class AccountMonitor: ObservableObject, Identifiable {
         account.remoteID = profile.remoteID ?? account.remoteID
         account.email = profile.email ?? account.email
         account.plan = profile.planLabel ?? account.plan
-        if account.label.isEmpty {
-            account.label = profile.name ?? profile.email ?? account.label
+        // `label` is never empty — creation gives it a "Account 2" placeholder — so the
+        // question is whether the user has since chosen a name of their own.
+        if !account.hasCustomLabel, let name = profile.name ?? profile.email {
+            account.label = name
         }
     }
 }

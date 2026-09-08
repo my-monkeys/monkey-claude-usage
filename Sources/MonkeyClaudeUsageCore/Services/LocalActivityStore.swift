@@ -13,10 +13,13 @@ public actor LocalActivityStore {
     private static let usageKey = Array("\"usage\"".utf8)
     /// Below this, a line cannot hold a usage block — skips the bookkeeping records.
     private static let minimumBilledLineLength = 64
+    private static let headSampleLength = 512
 
     private let projectsDirectory: URL
     private let cacheURL: URL
-    private var cache: Cache
+    /// Decoded on first use, not in `init`: the cache runs to a couple of megabytes and
+    /// the initialiser is reached from the main actor.
+    private var loadedCache: Cache?
 
     public init(
         projectsDirectory: URL? = nil,
@@ -27,7 +30,16 @@ public actor LocalActivityStore {
                 .appendingPathComponent(".claude/projects", isDirectory: true)
         let directory = cacheDirectory ?? UsageHistoryStore.defaultDirectory.deletingLastPathComponent()
         self.cacheURL = directory.appendingPathComponent("local-activity.json")
-        self.cache = Cache.load(from: cacheURL) ?? Cache()
+    }
+
+    private var cache: Cache {
+        get {
+            if let loadedCache { return loadedCache }
+            let loaded = Cache.load(from: cacheURL) ?? Cache()
+            loadedCache = loaded
+            return loaded
+        }
+        set { loadedCache = newValue }
     }
 
     public var isAvailable: Bool {
@@ -55,41 +67,55 @@ public actor LocalActivityStore {
             return
         }
 
+        var changed = false
         var live: Set<String> = []
         for relative in files where relative.hasSuffix(".jsonl") {
             let url = projectsDirectory.appendingPathComponent(relative)
             live.insert(relative)
-            scan(url, key: relative)
+            if scan(url, key: relative) { changed = true }
         }
 
         // A transcript the user deleted should stop counting.
-        cache.files = cache.files.filter { live.contains($0.key) }
-        cache.save(to: cacheURL)
+        if cache.files.count != live.count {
+            cache.files = cache.files.filter { live.contains($0.key) }
+            changed = true
+        }
+
+        // Rewriting a few megabytes of fingerprints when nothing moved is the common case
+        // — a poll every couple of minutes finds no new transcript at all.
+        if changed { cache.save(to: cacheURL) }
     }
 
     // MARK: - Scanning
 
-    private func scan(_ url: URL, key: String) {
+    /// - Returns: whether the cache changed and needs writing back.
+    @discardableResult
+    private func scan(_ url: URL, key: String) -> Bool {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attributes[.size] as? Int,
-              let modified = attributes[.modificationDate] as? Date else { return }
+              let modified = attributes[.modificationDate] as? Date else { return false }
 
         var entry = cache.files[key] ?? FileState()
-        if entry.size == size, entry.modified == modified { return }
+        if entry.size == size, entry.modified == modified { return false }
 
-        // A file that shrank was rewritten, not appended to.
-        if size < entry.offset {
+        // A transcript that shrank was rewritten. So was one that grew while its head
+        // changed — appending never rewrites what is already there, so a size that is
+        // merely larger is not proof of an append. Comparing the first bytes is cheap
+        // next to re-reading gigabytes, and wrong only in the impossible case of a
+        // rewrite that keeps its opening line.
+        if size < entry.offset || !headMatches(url, entry: entry) {
             entry = FileState()
         }
 
         // Memory-mapped and walked with memchr/memmem. Data's Collection conformance is
         // far too slow at this scale — the same pass costs fifty seconds through
         // `firstIndex(of:)` and two through raw pointers.
-        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return }
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return false }
 
         var slots = entry.slots
         var seen = entry.seen
         var consumed = entry.offset
+        entry.head = Self.fingerprint(data.prefix(Self.headSampleLength))
 
         data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
@@ -123,6 +149,17 @@ public actor LocalActivityStore {
         entry.slots = slots
         entry.seen = seen
         cache.files[key] = entry
+        return true
+    }
+
+    /// Cheap identity check for an append-only file: transcripts start with a session
+    /// record that never changes, so a different opening means a different file.
+    private func headMatches(_ url: URL, entry: FileState) -> Bool {
+        guard entry.offset > 0 else { return true }
+        guard let handle = try? FileHandle(forReadingFrom: url),
+              let head = try? handle.read(upToCount: Self.headSampleLength) else { return false }
+        try? handle.close()
+        return Self.fingerprint(head) == entry.head
     }
 
     /// Most lines are user turns and tool results with no billing information; testing
@@ -165,8 +202,12 @@ public actor LocalActivityStore {
     /// FNV-1a rather than `hashValue`: Swift's hashing is seeded per process, so a cached
     /// set would stop matching after a relaunch.
     private static func fingerprint(_ value: String) -> UInt64 {
+        fingerprint(Data(value.utf8))
+    }
+
+    private static func fingerprint(_ value: Data) -> UInt64 {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in value.utf8 {
+        for byte in value {
             hash ^= UInt64(byte)
             hash = hash &* 0x0000_0100_0000_01b3
         }
@@ -195,6 +236,7 @@ public actor LocalActivityStore {
         var offset = 0
         var slots: [Int64: [String: TokenCounts]] = [:]
         var seen: Set<UInt64> = []
+        var head: UInt64 = 0
     }
 
     private struct Cache: Codable {
