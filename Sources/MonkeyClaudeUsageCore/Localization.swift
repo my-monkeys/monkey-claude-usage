@@ -41,6 +41,8 @@ public enum PreferenceKey {
     public static let retentionDays = "historyRetentionDays"
     public static let selectedAccount = "selectedAccountID"
     public static let chartRange = "chartRange"
+    public static let activityRange = "activityRange"
+    public static let activityMeasure = "activityMeasure"
 }
 
 let englishStrings: [String: String] = [
@@ -73,6 +75,20 @@ let englishStrings: [String: String] = [
     "rate_limited": "Rate limited by the API, retrying later",
     "history": "History",
     "history_empty": "The chart fills in as the app polls. Come back in a few minutes.",
+    "burned_per_bucket": "Session — burned per %@",
+    "weekly_trend": "This week",
+    "bucket_hour": "hour",
+    "bucket_15min": "15 min",
+    "all_models": "All models",
+    "activity": "Local activity",
+    "activity_subtitle": "Claude Code on this Mac, every account together — the transcripts carry no account.",
+    "activity_empty": "No Claude Code transcript found in ~/.claude/projects.",
+    "activity_scanning": "Reading the transcripts…",
+    "activity_total": "%@ tokens",
+    "measure_all_tokens": "All tokens",
+    "measure_output": "Output only",
+    "range_90d": "90 d",
+    "no_activity_in_range": "Nothing in this range.",
     "range_6h": "6 h",
     "range_24h": "24 h",
     "range_7d": "7 d",
@@ -123,6 +139,20 @@ let frenchStrings: [String: String] = [
     "rate_limited": "Trop de requêtes, nouvelle tentative plus tard",
     "history": "Historique",
     "history_empty": "Le graphique se remplit au fil des relevés. Revenez dans quelques minutes.",
+    "burned_per_bucket": "Session — brûlé par %@",
+    "weekly_trend": "Cette semaine",
+    "bucket_hour": "heure",
+    "bucket_15min": "15 min",
+    "all_models": "Tous modèles",
+    "activity": "Activité locale",
+    "activity_subtitle": "Claude Code sur ce Mac, tous comptes confondus — les transcriptions ne portent aucun compte.",
+    "activity_empty": "Aucune transcription Claude Code dans ~/.claude/projects.",
+    "activity_scanning": "Lecture des transcriptions…",
+    "activity_total": "%@ jetons",
+    "measure_all_tokens": "Tous les jetons",
+    "measure_output": "Sortie seule",
+    "range_90d": "90 j",
+    "no_activity_in_range": "Rien sur cette plage.",
     "range_6h": "6 h",
     "range_24h": "24 h",
     "range_7d": "7 j",

@@ -4,7 +4,8 @@ import SwiftUI
 struct AccountUsageView: View {
     @ObservedObject var monitor: AccountMonitor
     let now: Date
-    @Binding var chartRange: ChartRange
+    @Binding var sessionRange: ChartRange
+    let pollingMinutes: Int
     let onReauthorize: () -> Void
 
     var body: some View {
@@ -35,7 +36,12 @@ struct AccountUsageView: View {
 
                 Divider().opacity(0.5)
 
-                UsageChartView(samples: monitor.history, limits: snapshot.limits, range: $chartRange)
+                QuotaHistoryView(
+                    limits: snapshot.limits,
+                    samples: monitor.history,
+                    pollingMinutes: pollingMinutes,
+                    sessionRange: $sessionRange
+                )
             } else if monitor.state == .ready {
                 ProgressView()
                     .controlSize(.small)

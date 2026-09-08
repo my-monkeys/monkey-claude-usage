@@ -42,8 +42,56 @@ enum PreviewRenderer {
         }
 
         renderPopovers(session: session, weekly: weekly, fable: fable, into: directory)
+        renderActivity(into: directory)
 
-        print("wrote \(cases.count + ChartRange.allCases.count) previews to \(directory.path)")
+        print("wrote \(cases.count + ChartRange.sessionCases.count + ChartRange.activityCases.count) previews to \(directory.path)")
+    }
+
+    /// The activity pane reads the transcripts of the Mac it runs on, so this preview
+    /// shows real data rather than the synthetic history used for the quota chart.
+    private static func renderActivity(into directory: URL) {
+        let model = ActivityModel()
+        model.load()
+
+        // The first scan walks every transcript; give it room before capturing.
+        let deadline = Date().addingTimeInterval(40)
+        while model.slots.isEmpty, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        for range in ChartRange.activityCases {
+            var value = range
+            var measure = ActivityMeasure.allTokens
+            let view = ActivityView(
+                model: model,
+                range: Binding(get: { value }, set: { value = $0 }),
+                measure: Binding(get: { measure }, set: { measure = $0 })
+            )
+            .padding(14)
+            .frame(width: Theme.popoverWidth)
+            .background(Color(nsColor: .windowBackgroundColor))
+
+            capture(view, to: directory.appendingPathComponent("activity-\(range.rawValue).png"))
+        }
+    }
+
+    private static func capture(_ view: some View, to url: URL) {
+        let hosting = NSHostingView(rootView: view)
+        hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
+
+        let window = NSWindow(
+            contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.contentView = hosting
+        window.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
+        hosting.layoutSubtreeIfNeeded()
+
+        if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+            hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+            try? bitmap.representation(using: .png, properties: [:])?.write(to: url)
+        }
+        window.orderOut(nil)
     }
 
     /// One image per range: a chart that reads well over six hours can be unreadable
@@ -58,8 +106,22 @@ enum PreviewRenderer {
         let previous = defaults.string(forKey: PreferenceKey.chartRange)
         defer { defaults.set(previous, forKey: PreferenceKey.chartRange) }
 
-        for range in ChartRange.allCases {
+        for range in ChartRange.sessionCases {
             defaults.set(range.rawValue, forKey: PreferenceKey.chartRange)
+            var value = range
+            let snapshot = UsageSnapshot(limits: [session, weekly, fable])
+            capture(
+                QuotaHistoryView(
+                    limits: snapshot.limits,
+                    samples: syntheticHistory(for: snapshot),
+                    pollingMinutes: 15,
+                    sessionRange: Binding(get: { value }, set: { value = $0 })
+                )
+                .padding(14)
+                .frame(width: Theme.popoverWidth)
+                .background(Color(nsColor: .windowBackgroundColor)),
+                to: directory.appendingPathComponent("quota-\(range.rawValue).png")
+            )
             renderPopover(
                 session: session, weekly: weekly, fable: fable,
                 to: directory.appendingPathComponent("popover-\(range.rawValue).png")
@@ -149,11 +211,20 @@ enum PreviewRenderer {
         // The window still running has to end on the value the snapshot reports.
         if age < period { return limit.percent * max(0, min(1, 1 - age / period)) }
 
-        // Work comes in bursts, and mostly during the day.
-        let burst = 0.55 + 0.45 * sin(elapsed / 9_000 + seed)
-        let daytime = 0.35 + 0.65 * max(0, sin(elapsed / 86_400 * 2 * .pi - 1.2))
+        // A quota only ever climbs until its window rolls over, so the shape has to be
+        // monotone inside a window — the burstiness goes into how steep it climbs, not
+        // into dips that would read as phantom resets.
+        let windowIndex = floor(elapsed / period)
+        let daytime = 0.35 + 0.65 * max(0, sin(windowIndex * 0.7 + seed))
         let ceiling = 45 + seed.truncatingRemainder(dividingBy: 50)
-        return max(0, min(100, ceiling * phase * burst * daytime * 1.6))
+
+        // The integral of a strictly positive burst rate: lumpy, but never decreasing,
+        // so no bucket looks like a phantom reset.
+        let rate = 14.0
+        let amplitude = 0.9
+        let climb = phase + amplitude * (1 - cos(rate * phase + seed)) / rate
+        let full = 1 + amplitude * (1 - cos(rate + seed)) / rate
+        return max(0, min(100, ceiling * (climb / full) * daytime * 1.6))
     }
 
     /// Template images carry no colour; draw them onto a light background at 4× so the

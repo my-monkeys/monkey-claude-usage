@@ -3,7 +3,10 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var state: AppState
-    @AppStorage(PreferenceKey.chartRange) private var storedRange = ChartRange.day.rawValue
+    @StateObject private var activity = ActivityModel()
+    @AppStorage(PreferenceKey.chartRange) private var storedRange = ChartRange.sixHours.rawValue
+    @AppStorage(PreferenceKey.activityRange) private var storedActivityRange = ChartRange.week.rawValue
+    @AppStorage(PreferenceKey.activityMeasure) private var storedMeasure = ActivityMeasure.allTokens.rawValue
 
     /// Ticks the relative dates ("resets in 2 h 10") without re-polling the API.
     @State private var now = Date()
@@ -11,6 +14,7 @@ struct PopoverView: View {
     @State private var accountPendingRemoval: Account?
     @State private var accountBeingRenamed: Account?
     @State private var draftName = ""
+    @State private var showsActivity = false
 
     private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -23,11 +27,14 @@ struct PopoverView: View {
             if !state.hasAccounts || isAddingAccount || state.pendingAuthorization != nil {
                 SignInView(state: state, isFirstAccount: !state.hasAccounts)
                     .onChange(of: state.signInRevision) { isAddingAccount = false }
+            } else if showsActivity {
+                ActivityView(model: activity, range: activityRange, measure: measure)
             } else if let monitor = state.selectedMonitor {
                 AccountUsageView(
                     monitor: monitor,
                     now: now,
-                    chartRange: chartRange,
+                    sessionRange: chartRange,
+                    pollingMinutes: state.pollingMinutes,
                     onReauthorize: { isAddingAccount = true }
                 )
             }
@@ -77,8 +84,22 @@ struct PopoverView: View {
 
     private var chartRange: Binding<ChartRange> {
         Binding(
-            get: { ChartRange(rawValue: storedRange) ?? .day },
+            get: { ChartRange(rawValue: storedRange) ?? .sixHours },
             set: { storedRange = $0.rawValue }
+        )
+    }
+
+    private var activityRange: Binding<ChartRange> {
+        Binding(
+            get: { ChartRange(rawValue: storedActivityRange) ?? .week },
+            set: { storedActivityRange = $0.rawValue }
+        )
+    }
+
+    private var measure: Binding<ActivityMeasure> {
+        Binding(
+            get: { ActivityMeasure(rawValue: storedMeasure) ?? .allTokens },
+            set: { storedMeasure = $0.rawValue }
         )
     }
 
@@ -108,6 +129,7 @@ struct PopoverView: View {
                     ambiguous: isAmbiguous(monitor)
                 ) {
                     isAddingAccount = false
+                    showsActivity = false
                     state.cancelSignIn()
                     state.select(monitor.id)
                 }
@@ -124,6 +146,7 @@ struct PopoverView: View {
 
             Button {
                 isAddingAccount = true
+                showsActivity = false
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 10, weight: .semibold))
@@ -133,6 +156,23 @@ struct PopoverView: View {
             .help(L("add_account"))
 
             Spacer(minLength: 0)
+
+            // Sits apart from the account tabs on purpose: what it shows belongs to the
+            // machine, not to an account.
+            Button {
+                showsActivity.toggle()
+                isAddingAccount = false
+            } label: {
+                Image(systemName: "chart.bar")
+                    .font(.system(size: 11, weight: showsActivity ? .semibold : .regular))
+                    .frame(width: 24, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(showsActivity ? Color.primary.opacity(0.10) : .clear)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(L("activity"))
         }
     }
 
