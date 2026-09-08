@@ -10,7 +10,7 @@ chaîne d'attribution est dans `LICENSE` et le README, **ne pas la retirer**.
 ## Commandes
 
 ```bash
-swift test                 # 11 tests (parsing, compte à rebours, historique)
+swift test                 # 15 tests (parsing, compte à rebours, historique, appcast, traductions)
 swift build                # les deux targets
 ./scripts/build-dmg.sh     # dist/Monkey Claude Usage.app + dist/MonkeyClaudeUsage-<v>.dmg
 ./scripts/release.sh 1.0.0 # signe, notarise, tag, release GitHub, met à jour le cask
@@ -122,6 +122,50 @@ que l'app n'a pas observés plutôt que d'étaler un saut sur des heures où il 
 ⚠️ `BarMark(x:unit:)` avec `.second` donne des barres larges d'une seconde, donc invisibles.
 Un seau de quinze minutes n'étant pas une unité de calendrier, les barres se posent en
 `xStart`/`xEnd`.
+
+## ⚠️ Fuseau horaire et cadence de relevé
+
+Deux pièges d'agrégation, tous deux vécus :
+
+- **Un multiple de 86 400 secondes Unix, c'est minuit UTC**, pas minuit local. Aligner un
+  seau « jour » dessus le fait commencer à 02:00 à Paris pendant que l'axe l'étiquette en
+  local. `Activity.buckets` et `ConsumptionSeries` décalent donc l'origine de
+  `calendar.timeZone.secondsFromGMT(for:)` avant l'arrondi. Même défaut sur les seaux
+  horaires dans les fuseaux à décalage non entier (+5:30, +5:45, −3:30).
+- **La cadence de relevé se mesure, elle ne se lit pas dans les réglages.** Prendre
+  `pollingMinutes` courant condamne rétroactivement en « trou » une semaine sondée à une
+  autre cadence. `ConsumptionSeries` prend la **médiane** des intervalles observés (robuste
+  au long trou d'un Mac endormi, ce qu'une moyenne n'est pas), et refuse un seau plus fin
+  que cette cadence — sinon un relevé par seau et un seau vide sur deux, ce qui se lit
+  comme de l'inactivité.
+
+## ⚠️ BarMark : deux initialiseurs, deux formes
+
+`BarMark(xStart:xEnd:y:)` est la forme **horizontale** : elle dessine une dalle flottante à
+la hauteur de la valeur, pas une colonne partant de zéro. Et aucune forme de `BarMark` ne
+prend un intervalle traçable sur **les deux** axes.
+
+- Session (série unique, largeur exacte) → **`RectangleMark(xStart:xEnd:yStart:yEnd:)`**.
+- Activité (empilement par modèle) → **`BarMark(x:y:width:)`**, seule forme qui empile, avec
+  une largeur en points calculée depuis le nombre de seaux.
+
+⚠️ `chartForegroundStyleScale(domain:range:)` avec des tailles différentes donne
+silencieusement la même couleur à deux séries. Cette machine a déjà servi **six** versions
+de modèle : au-delà de la palette, la queue est repliée sur une série « Autres ».
+
+## Auto-update (Sparkle)
+
+`docs/RELEASING.md` fait foi. Trois choses qui ne se devinent pas :
+
+- **SwiftPM ne pose aucun `@rpath` pour Sparkle** et **re-signe tout son arbre en ad-hoc**
+  en le copiant, XPC et `Updater.app` compris. `build-app.sh` ajoute le rpath *avant* de
+  signer, et re-signe chaque bundle imbriqué du plus profond au moins profond. Vérifier
+  avec `codesign --verify --deep --strict` : sans `--deep`, l'ad-hoc passe au vert.
+- **`CFBundleVersion` est comparé numériquement** par Sparkle : la chaîne de version ferait
+  perdre « 0.10.0 » contre « 0.2.0 ». D'où l'entier `major×10000 + minor×100 + patch`.
+- La clé privée EdDSA est dans le trousseau au compte **`monkey-claude-usage`** (un autre
+  couple, `ed25519`, traînait déjà). Le premier `sign_update` ouvre une fenêtre du trousseau
+  et **bloque `release.sh` sans message** : répondre « Toujours autoriser ».
 
 ## Verre liquide (macOS 26+)
 
