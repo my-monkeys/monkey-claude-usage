@@ -166,10 +166,8 @@ struct PopoverView: View {
                 Image(systemName: "chart.bar")
                     .font(.system(size: 11, weight: showsActivity ? .semibold : .regular))
                     .frame(width: 24, height: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(showsActivity ? Color.primary.opacity(0.10) : .clear)
-                    )
+                    .glassChip(isProminent: showsActivity)
+                    .opacity(showsActivity ? 1 : 0.72)
             }
             .buttonStyle(.plain)
             .help(L("activity"))
@@ -227,10 +225,8 @@ private struct AccountTab: View {
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.primary.opacity(0.10) : .clear)
-            )
+            .glassChip(isProminent: isSelected)
+            .opacity(isSelected ? 1 : 0.72)
         }
         .buttonStyle(.plain)
         .help([monitor.account.email, monitor.account.plan].compactMap { $0 }.joined(separator: " · "))

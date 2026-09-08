@@ -64,7 +64,7 @@ struct AccountUsageView: View {
                     .font(.system(size: 9, weight: .semibold))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
+                    .glassChip(cornerRadius: 8)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
@@ -108,6 +108,6 @@ struct AccountUsageView: View {
         }
         .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
     }
 }

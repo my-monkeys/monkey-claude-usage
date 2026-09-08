@@ -113,7 +113,7 @@ private struct AccountRow: View {
             Text(tag)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .frame(width: 20, height: 20)
-                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                .glassChip(cornerRadius: 6)
                 .help(L("menu_bar_tag_help"))
 
             VStack(alignment: .leading, spacing: 2) {
@@ -135,7 +135,7 @@ private struct AccountRow: View {
                     .font(.system(size: 9, weight: .semibold))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
+                    .glassChip(cornerRadius: 8)
                     .foregroundStyle(.secondary)
             }
 
