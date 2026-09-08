@@ -9,6 +9,8 @@ struct PopoverView: View {
     @State private var now = Date()
     @State private var isAddingAccount = false
     @State private var accountPendingRemoval: Account?
+    @State private var accountBeingRenamed: Account?
+    @State private var draftName = ""
 
     private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -35,6 +37,25 @@ struct PopoverView: View {
         .padding(14)
         .frame(width: Theme.popoverWidth)
         .onReceive(clock) { now = $0 }
+        .onReceive(NotificationCenter.default.publisher(for: .openSignIn)) { _ in
+            isAddingAccount = true
+        }
+        .alert(L("rename_account"), isPresented: Binding(
+            get: { accountBeingRenamed != nil },
+            set: { if !$0 { accountBeingRenamed = nil } }
+        )) {
+            TextField(L("rename_account"), text: $draftName)
+            Button(L("validate")) {
+                if let account = accountBeingRenamed {
+                    let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { state.rename(account.id, to: trimmed) }
+                }
+                accountBeingRenamed = nil
+            }
+            Button(L("cancel"), role: .cancel) { accountBeingRenamed = nil }
+        } message: {
+            if let email = accountBeingRenamed?.email { Text(email) }
+        }
         .confirmationDialog(
             accountPendingRemoval.map { L("delete_confirm", $0.displayName) } ?? "",
             isPresented: Binding(
@@ -48,6 +69,10 @@ struct PopoverView: View {
             }
             Button(L("cancel"), role: .cancel) { accountPendingRemoval = nil }
         }
+    }
+
+    private func isAmbiguous(_ monitor: AccountMonitor) -> Bool {
+        state.monitors.filter { $0.account.displayName == monitor.account.displayName }.count > 1
     }
 
     private var chartRange: Binding<ChartRange> {
@@ -79,13 +104,18 @@ struct PopoverView: View {
                 AccountTab(
                     monitor: monitor,
                     isSelected: !isAddingAccount && state.selectedAccountID == monitor.id,
-                    now: now
+                    tag: state.menuBarTag(for: monitor.id),
+                    ambiguous: isAmbiguous(monitor)
                 ) {
                     isAddingAccount = false
                     state.cancelSignIn()
                     state.select(monitor.id)
                 }
                 .contextMenu {
+                    Button(L("rename_account")) {
+                        draftName = monitor.account.label
+                        accountBeingRenamed = monitor.account
+                    }
                     Button(L("remove_account"), role: .destructive) {
                         accountPendingRemoval = monitor.account
                     }
@@ -128,12 +158,20 @@ struct PopoverView: View {
 private struct AccountTab: View {
     @ObservedObject var monitor: AccountMonitor
     let isSelected: Bool
-    let now: Date
+    let tag: String
+    /// Two accounts can carry the same name — the profile endpoint names both of them
+    /// after the same person — so the tab then shows the menu bar tag to tell them apart.
+    let ambiguous: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
+                if ambiguous {
+                    Text(tag)
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
                 Text(monitor.account.displayName)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
@@ -155,9 +193,12 @@ private struct AccountTab: View {
             )
         }
         .buttonStyle(.plain)
+        .help([monitor.account.email, monitor.account.plan].compactMap { $0 }.joined(separator: " · "))
     }
 }
 
 extension Notification.Name {
     static let openSettings = Notification.Name("fr.mymonkey.monkeyclaudeusage.openSettings")
+    /// Posted by Settings so the popover shows the code field for a sign-in it started.
+    static let openSignIn = Notification.Name("fr.mymonkey.monkeyclaudeusage.openSignIn")
 }

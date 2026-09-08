@@ -124,13 +124,19 @@ struct UsagePayload: Decodable {
 /// The API returns six fractional digits (`…:00.435533+00:00`), which the strict
 /// ISO-8601 parsers reject depending on the OS build — hence the truncating fallback.
 public enum ISO8601 {
+    /// Format styles rather than `ISO8601DateFormatter`: the latter wraps a
+    /// `CFDateFormatter` that has to be allocated per use under strict concurrency, which
+    /// costs tens of seconds across a hundred thousand transcript lines. These are values,
+    /// `Sendable`, and built once.
+    private static let styles = [
+        Date.ISO8601FormatStyle(includingFractionalSeconds: true),
+        Date.ISO8601FormatStyle(),
+    ]
+
     public static func date(from value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
-        for options in [[.withInternetDateTime, .withFractionalSeconds], [.withInternetDateTime]]
-            as [ISO8601DateFormatter.Options] {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = options
-            if let date = formatter.date(from: value) { return date }
+        for style in styles {
+            if let date = try? style.parse(value) { return date }
         }
         return date(fromTruncated: value)
     }
@@ -139,9 +145,7 @@ public enum ISO8601 {
         guard let dot = value.firstIndex(of: ".") else { return nil }
         let tail = value[dot...].dropFirst()
         guard let boundary = tail.firstIndex(where: { !$0.isNumber }) else { return nil }
-        let truncated = value[..<dot] + String(tail[boundary...])
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: String(truncated))
+        let truncated = String(value[..<dot] + tail[boundary...])
+        return try? styles[1].parse(truncated)
     }
 }

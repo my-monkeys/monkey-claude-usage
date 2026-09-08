@@ -5,3 +5,4 @@ DerivedData/
 dist/
 .DS_Store
 .release.env
+.claude/

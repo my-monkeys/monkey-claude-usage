@@ -65,19 +65,35 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             List {
                 ForEach(state.monitors) { monitor in
-                    AccountRow(monitor: monitor) { label in
-                        state.rename(monitor.id, to: label)
-                    } onRemove: {
-                        state.remove(monitor.id)
-                    }
+                    AccountRow(
+                        monitor: monitor,
+                        tag: state.menuBarTag(for: monitor.id),
+                        onRename: { state.rename(monitor.id, to: $0) },
+                        onRemove: { state.remove(monitor.id) }
+                    )
                 }
                 .onMove { state.move(fromOffsets: $0, toOffset: $1) }
             }
+
+            HStack(spacing: 8) {
+                Button {
+                    NSWorkspace.shared.open(state.beginSignIn())
+                    NotificationCenter.default.post(name: .openSignIn, object: nil)
+                } label: {
+                    Label(L("add_account"), systemImage: "plus")
+                }
+                .controlSize(.small)
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
 
             Text(L("second_account_hint"))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
         }
     }
@@ -85,23 +101,28 @@ struct SettingsView: View {
 
 private struct AccountRow: View {
     @ObservedObject var monitor: AccountMonitor
+    let tag: String
     let onRename: (String) -> Void
     let onRemove: () -> Void
 
     @State private var label = ""
+    @FocusState private var isEditing: Bool
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(monitor.account.tag)
+            Text(tag)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .frame(width: 20, height: 20)
                 .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                .help(L("menu_bar_tag_help"))
 
             VStack(alignment: .leading, spacing: 2) {
                 TextField(L("rename_account"), text: $label)
-                    .textFieldStyle(.plain)
+                    .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
-                    .onSubmit { onRename(label) }
+                    .focused($isEditing)
+                    .onSubmit(commit)
+
                 if let email = monitor.account.email {
                     Text(email)
                         .font(.system(size: 10))
@@ -109,7 +130,14 @@ private struct AccountRow: View {
                 }
             }
 
-            Spacer()
+            if let plan = monitor.account.plan {
+                Text(plan)
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.primary.opacity(0.08), in: Capsule())
+                    .foregroundStyle(.secondary)
+            }
 
             Button(role: .destructive, action: onRemove) {
                 Image(systemName: "trash")
@@ -120,6 +148,21 @@ private struct AccountRow: View {
         .onAppear { label = monitor.account.label }
         // The label arrives with the profile, often after this row is on screen; without
         // this, submitting the field would write the stale placeholder back.
-        .onChange(of: monitor.account.label) { _, new in label = new }
+        .onChange(of: monitor.account.label) { _, new in
+            if !isEditing { label = new }
+        }
+        // Clicking away is as much a commit as pressing return.
+        .onChange(of: isEditing) { wasEditing, _ in
+            if wasEditing { commit() }
+        }
+    }
+
+    private func commit() {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != monitor.account.label else {
+            label = monitor.account.label
+            return
+        }
+        onRename(trimmed)
     }
 }

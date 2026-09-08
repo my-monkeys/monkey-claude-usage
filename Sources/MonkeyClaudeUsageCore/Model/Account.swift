@@ -32,8 +32,9 @@ public struct Account: Codable, Sendable, Equatable, Identifiable, Hashable {
         return String(id.uuidString.prefix(4))
     }
 
-    /// Single character identifying the account in the menu bar.
-    public var tag: String {
+    /// First letter of the name — only unique if the names are. `AppState.menuBarTag(for:)`
+    /// is what the menu bar uses; it falls back to numbers when two accounts collide.
+    public var initial: String {
         let source = label.isEmpty ? (email ?? "?") : label
         return String(source.prefix(1)).uppercased()
     }

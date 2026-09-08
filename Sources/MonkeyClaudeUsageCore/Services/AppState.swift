@@ -66,6 +66,16 @@ public final class AppState: ObservableObject {
 
     public var hasAccounts: Bool { !monitors.isEmpty }
 
+    /// One character per account for the menu bar. Two accounts often share a first
+    /// letter — the profile endpoint names both of Maxim's accounts "Maxim" — and two
+    /// identical letters make the menu bar unreadable, so a collision demotes *every*
+    /// account to its position number rather than mixing letters and digits.
+    public func menuBarTag(for accountID: UUID) -> String {
+        guard let index = monitors.firstIndex(where: { $0.id == accountID }) else { return "?" }
+        let initials = monitors.map(\.account.initial)
+        return Set(initials).count == initials.count ? initials[index] : "\(index + 1)"
+    }
+
     public func start() {
         Task {
             for monitor in monitors { await monitor.loadHistory() }
