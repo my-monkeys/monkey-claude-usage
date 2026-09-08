@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = AppState()
     private let notifications = NotificationService()
 
+    // Built after the `--render-preview` early exit: that path never gets an event loop,
+    // and a Sparkle updater started there would look for a feed it must not fetch.
+    private var updater: Updater!
+
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var settingsWindow: NSWindow?
@@ -21,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.terminate(nil)
             return
         }
+
+        updater = Updater()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
@@ -84,9 +90,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showContextMenu() {
         let menu = NSMenu()
         menu.addItem(item(L("refresh"), #selector(refreshNow)))
+
+        let checkForUpdates = item(L("check_for_updates"), #selector(checkForUpdates))
+        checkForUpdates.isEnabled = updater.canCheckForUpdates
+        menu.addItem(checkForUpdates)
+
         menu.addItem(item(L("settings"), #selector(openSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(item(L("quit"), #selector(quit), key: "q"))
+
+        // NSMenu re-enables items from the responder chain unless told otherwise, which
+        // would undo the line above.
+        menu.autoenablesItems = false
 
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
@@ -105,6 +120,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await state.refreshAll(force: true) }
     }
 
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
     }
@@ -119,13 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 330),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 400),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = L("settings")
-        window.contentView = NSHostingView(rootView: SettingsView(state: state))
+        window.contentView = NSHostingView(rootView: SettingsView(state: state, updater: updater))
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)

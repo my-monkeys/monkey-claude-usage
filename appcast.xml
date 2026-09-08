@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Monkey Claude Usage</title>
+    <link>https://github.com/my-monkeys/monkey-claude-usage</link>
+    <description>Updates for Monkey Claude Usage, the macOS menu bar Claude usage meter.</description>
+    <language>en</language>
+    <item>
+      <title>0.1.0</title>
+      <link>https://github.com/my-monkeys/monkey-claude-usage/releases/tag/v0.1.0</link>
+      <sparkle:version>100</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 08 Sep 2026 17:44:56 +0000</pubDate>
+      <enclosure url="https://github.com/my-monkeys/monkey-claude-usage/releases/download/v0.1.0/MonkeyClaudeUsage-0.1.0.dmg" sparkle:edSignature="LL/9Hbxk9XSeMeUEWCvgVDBvsd725sZDcxX6jxea1SpRGxKpINj+OixAFYfGbCBjtf31UmYcA69l2z/S+k5oCQ==" length="2952889" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var state: AppState
+    @ObservedObject var updater: Updater
 
     @AppStorage(PreferenceKey.language) private var language = AppLanguage.system.rawValue
     @AppStorage(PreferenceKey.menuBarStyle) private var menuBarStyle = MenuBarStyle.bars.rawValue
@@ -18,7 +19,8 @@ struct SettingsView: View {
             general.tabItem { Label(L("settings"), systemImage: "gearshape") }
             accounts.tabItem { Label(L("accounts"), systemImage: "person.2") }
         }
-        .frame(width: 420, height: 330)
+        // Must match the window in AppDelegate.openSettings.
+        .frame(width: 420, height: 400)
     }
 
     private var general: some View {
@@ -52,10 +54,21 @@ struct SettingsView: View {
                     try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
                 }
 
+            Toggle(L("automatic_updates"), isOn: Binding(
+                get: { updater.automaticallyChecksForUpdates },
+                set: { updater.automaticallyChecksForUpdates = $0 }
+            ))
+
             Picker(L("language"), selection: $language) {
                 ForEach(AppLanguage.allCases, id: \.rawValue) { value in
                     Text(value.label).tag(value.rawValue)
                 }
+            }
+
+            if let version = Updater.displayedVersion {
+                Text(L("version", version))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
         }
         .formStyle(.grouped)
