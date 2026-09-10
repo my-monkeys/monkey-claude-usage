@@ -15,7 +15,7 @@ struct UsageBarView: View {
                 if limit.isActive {
                     Text("•")
                         .font(.system(size: 12))
-                        .foregroundStyle(Theme.tint(for: limit.percent))
+                        .foregroundStyle(Theme.barTint(for: limit.percent))
                         .help(limit.fullLabel)
                 }
 
@@ -24,7 +24,7 @@ struct UsageBarView: View {
                 Text("\(Int(limit.percent.rounded())) %")
                     .numeric()
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.tint(for: limit.percent))
+                    .foregroundStyle(Theme.numberTint(for: limit.percent))
             }
 
             GeometryReader { proxy in
@@ -32,7 +32,7 @@ struct UsageBarView: View {
                     Capsule()
                         .fill(Color.primary.opacity(Theme.trackOpacity))
                     Capsule()
-                        .fill(Theme.tint(for: limit.percent))
+                        .fill(Theme.barTint(for: limit.percent))
                         .frame(width: max(2, proxy.size.width * limit.fraction))
                 }
             }

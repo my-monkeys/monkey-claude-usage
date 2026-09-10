@@ -25,6 +25,7 @@ struct SignInView: View {
                     NSWorkspace.shared.open(state.beginSignIn())
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
             } else {
@@ -50,6 +51,7 @@ struct SignInView: View {
 
                     Button(L("validate"), action: submit)
                         .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
                         .controlSize(.small)
                         .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                   || state.isExchangingCode)

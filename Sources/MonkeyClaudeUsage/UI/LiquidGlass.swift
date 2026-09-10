@@ -27,7 +27,7 @@ private struct GlassChip: ViewModifier {
         // nothing at all — a chip that vanishes is worse than one that is merely opaque.
         let filled = content.background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(isProminent ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.08))
+                .fill(isProminent ? Theme.accent.opacity(0.20) : Color.primary.opacity(0.08))
         )
 
         #if compiler(>=6.2)

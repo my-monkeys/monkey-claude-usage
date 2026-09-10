@@ -75,7 +75,6 @@ struct ActivityView: View {
             Text(L("activity_total", Self.compact(total)))
                 .numeric()
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -154,8 +153,7 @@ struct ActivityView: View {
                         .font(.system(size: 10))
                     Text(Self.compact(totals[name] ?? 0))
                         .numeric()
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .semibold))
                 }
             }
         }

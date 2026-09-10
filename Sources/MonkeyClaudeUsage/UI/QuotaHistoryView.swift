@@ -108,7 +108,7 @@ struct QuotaHistoryView: View {
                             yStart: .value("zero", 0),
                             yEnd: .value("pts", bucket.points)
                         )
-                        .foregroundStyle(Theme.tint(for: limit.percent))
+                        .foregroundStyle(Theme.barTint(for: limit.percent))
                         .cornerRadius(1.5)
                     }
 

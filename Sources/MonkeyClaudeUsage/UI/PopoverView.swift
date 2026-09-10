@@ -231,7 +231,7 @@ private struct AccountTab: View {
 
                 if let peak = monitor.snapshot?.limits.map(\.percent).max() {
                     Circle()
-                        .fill(Theme.tint(for: peak))
+                        .fill(Theme.barTint(for: peak))
                         .frame(width: 5, height: 5)
                 }
             }

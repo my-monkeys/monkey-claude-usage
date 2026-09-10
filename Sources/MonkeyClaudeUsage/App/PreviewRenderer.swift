@@ -9,7 +9,16 @@ import SwiftUI
 @MainActor
 enum PreviewRenderer {
     static func run(outputDirectory: String) {
-        let directory = URL(fileURLWithPath: outputDirectory)
+        // Both appearances, because a colour that reads on one can vanish on the other and
+        // there is no way to tell without looking.
+        for appearance in [NSAppearance.Name.darkAqua, .aqua] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            render(into: URL(fileURLWithPath: outputDirectory)
+                .appendingPathComponent(appearance == .darkAqua ? "dark" : "light"))
+        }
+    }
+
+    private static func render(into directory: URL) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let now = Date()
