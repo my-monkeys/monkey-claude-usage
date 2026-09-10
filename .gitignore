@@ -6,3 +6,6 @@ dist/
 .DS_Store
 .release.env
 .claude/
+
+# Clé privée de signature des mises à jour — exportée à la demande, jamais commitée.
+sparkle-private-key*
