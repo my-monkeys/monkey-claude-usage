@@ -6,6 +6,15 @@
     <description>Updates for Monkey Claude Usage, the macOS menu bar Claude usage meter.</description>
     <language>en</language>
     <item>
+      <title>0.3.0</title>
+      <link>https://github.com/my-monkeys/monkey-claude-usage/releases/tag/v0.3.0</link>
+      <sparkle:version>300</sparkle:version>
+      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 11 Sep 2026 16:33:43 +0000</pubDate>
+      <enclosure url="https://github.com/my-monkeys/monkey-claude-usage/releases/download/v0.3.0/MonkeyClaudeUsage-0.3.0.dmg" sparkle:edSignature="ORbT/DG7+JRNRkIfcfQCs9KbGvMnB75POT8Dzux4aDXlP/IIyxQjlF7ZrYNVLmehXVhqrokb05M9DLEFolNjAA==" length="4395707" type="application/octet-stream" />
+    </item>
+    <item>
       <title>0.2.1</title>
       <link>https://github.com/my-monkeys/monkey-claude-usage/releases/tag/v0.2.1</link>
       <sparkle:version>201</sparkle:version>
