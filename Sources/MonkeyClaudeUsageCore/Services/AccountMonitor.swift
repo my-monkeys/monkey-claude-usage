@@ -69,6 +69,10 @@ public final class AccountMonitor: ObservableObject, Identifiable {
         history = await historyStore.load(accountID)
     }
 
+    public func setBadge(_ badge: AccountBadge?) {
+        account.badge = badge?.stored
+    }
+
     public func rename(_ label: String) {
         account.label = label
         account.hasCustomLabel = true

@@ -135,7 +135,7 @@ struct PopoverView: View {
                 AccountTab(
                     monitor: monitor,
                     isSelected: !isAddingAccount && state.selectedAccountID == monitor.id,
-                    tag: state.menuBarTag(for: monitor.id),
+                    badge: state.menuBarBadge(for: monitor.id),
                     ambiguous: isAmbiguous(monitor)
                 ) {
                     isAddingAccount = false
@@ -208,9 +208,9 @@ struct PopoverView: View {
 private struct AccountTab: View {
     @ObservedObject var monitor: AccountMonitor
     let isSelected: Bool
-    let tag: String
     /// Two accounts can carry the same name — the profile endpoint names both of them
-    /// after the same person — so the tab then shows the menu bar tag to tell them apart.
+    /// after the same person — so the tab then shows the menu bar badge to tell them apart.
+    let badge: AccountBadge
     let ambiguous: Bool
     let action: () -> Void
 
@@ -218,8 +218,7 @@ private struct AccountTab: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 if ambiguous {
-                    Text(tag)
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    BadgeView(badge: badge, size: 9)
                         .foregroundStyle(.secondary)
                 }
                 Text(monitor.account.displayName)

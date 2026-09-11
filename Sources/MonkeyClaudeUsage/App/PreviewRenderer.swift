@@ -32,14 +32,14 @@ enum PreviewRenderer {
         let spentSession = UsageLimit(kind: "session", group: "session", percent: 100,
                                       resetsAt: now.addingTimeInterval(3600 + 42 * 60))
 
-        let first = MenuBarAccount(tag: "M", limits: [session, weekly, fable])
-        let secondSpent = MenuBarAccount(tag: "P", limits: [spentSession, weekly, fable])
+        let first = MenuBarAccount(badge: .text("M"), limits: [session, weekly, fable])
+        let secondSpent = MenuBarAccount(badge: .symbol("briefcase.fill"), limits: [spentSession, weekly, fable])
 
         let cases: [(String, NSImage)] = [
             ("menubar-single", renderMenuBarIcon(accounts: [first], style: .bars, compact: false)),
             ("menubar-single-spent", renderMenuBarIcon(accounts: [secondSpent], style: .bars, compact: false)),
             ("menubar-single-logo", renderMenuBarIcon(accounts: [first], style: .both, compact: false)),
-            ("menubar-two", renderMenuBarIcon(accounts: [first, MenuBarAccount(tag: "P", limits: [session, weekly, fable])],
+            ("menubar-two", renderMenuBarIcon(accounts: [first, MenuBarAccount(badge: .symbol("briefcase.fill"), limits: [session, weekly, fable])],
                                               style: .bars, compact: false)),
             ("menubar-two-spent", renderMenuBarIcon(accounts: [first, secondSpent], style: .bars, compact: false)),
             ("menubar-compact", renderMenuBarIcon(accounts: [first, secondSpent], style: .bars, compact: true)),

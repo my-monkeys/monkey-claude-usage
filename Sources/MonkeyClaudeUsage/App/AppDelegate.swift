@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let accounts = state.monitors.compactMap { monitor -> MenuBarAccount? in
             guard let snapshot = monitor.snapshot else { return nil }
-            return MenuBarAccount(tag: state.menuBarTag(for: monitor.id), limits: snapshot.limits)
+            return MenuBarAccount(badge: state.menuBarBadge(for: monitor.id), limits: snapshot.limits)
         }
 
         statusItem.button?.image = accounts.isEmpty

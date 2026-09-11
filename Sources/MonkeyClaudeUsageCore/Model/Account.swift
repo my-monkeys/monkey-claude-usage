@@ -10,6 +10,9 @@ public struct Account: Codable, Sendable, Equatable, Identifiable, Hashable {
     /// as being the same Claude account rather than a new one.
     public var remoteID: String?
     public var plan: String?
+    /// Chosen in Settings. Without one the menu bar falls back to the first letter of
+    /// the name, or to a position number when two names start alike.
+    public var badge: String?
     /// Set the moment the user renames the account, so a later profile fetch never
     /// overwrites their choice — and so the placeholder given at creation can be.
     public var hasCustomLabel = false
@@ -20,6 +23,7 @@ public struct Account: Codable, Sendable, Equatable, Identifiable, Hashable {
         email: String? = nil,
         remoteID: String? = nil,
         plan: String? = nil,
+        badge: String? = nil,
         hasCustomLabel: Bool = false
     ) {
         self.id = id
@@ -27,6 +31,7 @@ public struct Account: Codable, Sendable, Equatable, Identifiable, Hashable {
         self.email = email
         self.remoteID = remoteID
         self.plan = plan
+        self.badge = badge
         self.hasCustomLabel = hasCustomLabel
     }
 

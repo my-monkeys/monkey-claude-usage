@@ -71,10 +71,15 @@ gère le contraste). Trois règles qui ne se devinent pas :
 - **Les lignes sont partagées entre comptes** pour que les barres s'alignent verticalement.
   Un compte qui n'a pas une fenêtre reçoit une barre en pointillés.
 - **Un compte n'a des étiquettes de ligne (`5h`/`7d`/`Fa`) que s'il est seul.** À plusieurs,
-  la place passe à une lettre par compte et l'ordre des lignes fait foi.
-- **Une limite saturée remplace les barres du compte par un compte à rebours** (`Fa 2j`).
-  C'est voulu : une barre pleine ne dit rien, l'heure de reset si. Le budget est de quatre
-  caractères — d'où `Countdown.short`, testé pour ça.
+  la place passe à un **badge** par compte (`AccountBadge`) et l'ordre des lignes fait foi.
+  Le badge est choisi dans les réglages — une ou deux lettres, ou un symbole SF rendu en
+  template ; sans choix, c'est l'initiale du nom, et un **numéro de position** si deux
+  initiales se ressemblent (le profil nomme tous les comptes d'après la même personne).
+- **Une limite saturée remplace les barres du compte par un compte à rebours**, et **rien
+  d'autre que le temps restant** (`3j`). Le code de la fenêtre le précédait (`7d 3d`) :
+  deux durées côte à côte se lisent comme une faute, et savoir *laquelle* se libère en
+  premier ne change rien à ce qu'on peut faire. Le budget est de quatre caractères — d'où
+  `Countdown.short`, testé pour ça.
 
 La hauteur utile est de 18 pt : `Metrics.rowGeometry` réduit la hauteur des barres quand il y
 a plus de trois fenêtres. Au-delà de cinq, ça devient illisible — préférer alors le popover.

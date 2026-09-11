@@ -66,14 +66,26 @@ public final class AppState: ObservableObject {
 
     public var hasAccounts: Bool { !monitors.isEmpty }
 
-    /// One character per account for the menu bar. Two accounts often share a first
-    /// letter — the profile endpoint names both of Maxim's accounts "Maxim" — and two
-    /// identical letters make the menu bar unreadable, so a collision demotes *every*
-    /// account to its position number rather than mixing letters and digits.
-    public func menuBarTag(for accountID: UUID) -> String {
-        guard let index = monitors.firstIndex(where: { $0.id == accountID }) else { return "?" }
+    /// What marks an account in the menu bar. A badge the user chose wins outright;
+    /// otherwise the first letter of the name, which is only useful while the letters
+    /// differ — the profile endpoint names every account after the same person, so a
+    /// collision demotes *every* account to its position number rather than mixing
+    /// letters and digits.
+    public func menuBarBadge(for accountID: UUID) -> AccountBadge {
+        guard let index = monitors.firstIndex(where: { $0.id == accountID }) else {
+            return .text("?")
+        }
+        if let chosen = AccountBadge(stored: monitors[index].account.badge) { return chosen }
+
+        let automatic = monitors.map { AccountBadge(stored: $0.account.badge) }
         let initials = monitors.map(\.account.initial)
-        return Set(initials).count == initials.count ? initials[index] : "\(index + 1)"
+        let free = zip(automatic, initials).filter { $0.0 == nil }.map(\.1)
+        return Set(free).count == free.count ? .text(initials[index]) : .text("\(index + 1)")
+    }
+
+    public func setBadge(_ badge: AccountBadge?, for accountID: UUID) {
+        monitors.first { $0.id == accountID }?.setBadge(badge)
+        persistAccounts()
     }
 
     public func start() {

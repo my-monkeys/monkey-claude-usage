@@ -80,8 +80,10 @@ struct SettingsView: View {
                 ForEach(state.monitors) { monitor in
                     AccountRow(
                         monitor: monitor,
-                        tag: state.menuBarTag(for: monitor.id),
+                        badge: state.menuBarBadge(for: monitor.id),
+                        isCustomBadge: monitor.account.badge != nil,
                         onRename: { state.rename(monitor.id, to: $0) },
+                        onBadge: { state.setBadge($0, for: monitor.id) },
                         onRemove: { state.remove(monitor.id) }
                     )
                 }
@@ -116,20 +118,21 @@ struct SettingsView: View {
 
 private struct AccountRow: View {
     @ObservedObject var monitor: AccountMonitor
-    let tag: String
+    let badge: AccountBadge
+    /// Whether the badge shown is the user's own choice or the automatic fallback.
+    let isCustomBadge: Bool
     let onRename: (String) -> Void
+    let onBadge: (AccountBadge?) -> Void
     let onRemove: () -> Void
 
     @State private var label = ""
+    @State private var letters = ""
+    @State private var isPickingBadge = false
     @FocusState private var isEditing: Bool
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(tag)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .frame(width: 20, height: 20)
-                .glassChip(cornerRadius: 6)
-                .help(L("menu_bar_tag_help"))
+            badgePicker
 
             VStack(alignment: .leading, spacing: 2) {
                 TextField(L("rename_account"), text: $label)
@@ -160,7 +163,10 @@ private struct AccountRow: View {
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 3)
-        .onAppear { label = monitor.account.label }
+        .onAppear {
+            label = monitor.account.label
+            letters = lettersFromBadge
+        }
         // The label arrives with the profile, often after this row is on screen; without
         // this, submitting the field would write the stale placeholder back.
         .onChange(of: monitor.account.label) { _, new in
@@ -170,6 +176,86 @@ private struct AccountRow: View {
         .onChange(of: isEditing) { wasEditing, _ in
             if wasEditing { commit() }
         }
+    }
+
+    /// A popover rather than a menu: the choice is visual, and a menu would list twelve
+    /// entries whose labels all read "Symbol".
+    private var badgePicker: some View {
+        Button { isPickingBadge = true } label: {
+            BadgeView(badge: badge)
+                .frame(width: 24, height: 22)
+                .foregroundStyle(isCustomBadge ? .primary : .secondary)
+                .glassChip(cornerRadius: 6)
+        }
+        .buttonStyle(.plain)
+        .help(L("menu_bar_tag_help"))
+        .popover(isPresented: $isPickingBadge, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L("badge_help"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 210, alignment: .leading)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 6), count: 6), spacing: 6) {
+                    ForEach(AccountBadge.offered, id: \.self) { name in
+                        Button {
+                            letters = ""
+                            onBadge(.symbol(name))
+                            isPickingBadge = false
+                        } label: {
+                            Image(systemName: name)
+                                .font(.system(size: 12))
+                                .frame(width: 26, height: 24)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(badge == .symbol(name)
+                                              ? Theme.accent.opacity(0.22)
+                                              : Color.primary.opacity(0.06))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    // Two characters at most: past that the menu bar has no room.
+                    TextField(L("badge_letters"), text: $letters)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(width: 62)
+                        .onChange(of: letters) { _, new in
+                            let trimmed = String(new.prefix(2))
+                            if trimmed != new { letters = trimmed }
+                        }
+                        .onSubmit(commitLetters)
+
+                    Button(L("badge_automatic")) {
+                        letters = ""
+                        onBadge(nil)
+                        isPickingBadge = false
+                    }
+                    .controlSize(.small)
+                    .disabled(!isCustomBadge)
+
+                    Spacer()
+                }
+            }
+            .padding(12)
+            .onDisappear(perform: commitLetters)
+        }
+    }
+
+    private func commitLetters() {
+        let trimmed = letters.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard badge != .text(trimmed) || !isCustomBadge else { return }
+        onBadge(.text(trimmed))
+    }
+
+    private var lettersFromBadge: String {
+        if case let .text(value) = badge, isCustomBadge { return value }
+        return ""
     }
 
     private func commit() {

@@ -90,17 +90,22 @@ The icon is drawn as a template image, so macOS handles contrast in light and da
 **One account** — rows are labelled: `5h` for the session, `7d` for the week, then one row per
 model-scoped window (`Fa` for Fable, `Op` for Opus…).
 
-**Several accounts** — labels give way to one letter per account, and the row order carries the
-meaning instead: session first, weekly next, model-scoped last. Rows are shared across accounts
-so the bars line up vertically; an account missing a given window gets a dashed bar in its place.
-Two accounts whose names start with the same letter — the default, since the profile endpoint
-names both after you — fall back to position numbers rather than showing `M` twice. Rename them
-in Settings → Accounts to choose your letters.
+**Several accounts** — labels give way to one **badge** per account, and the row order carries
+the meaning instead: session first, weekly next, model-scoped last. Rows are shared across
+accounts so the bars line up vertically; an account missing a given window gets a dashed bar in
+its place.
 
-**A spent window** replaces that account's bars with a short code and the time left on the
-**soonest** of its spent windows: `Fa 2d` means Fable is out for two days. The budget is four
-characters, which is what the countdown formatter is tested against. The rest of the detail is
-one click away in the popover.
+A badge is one or two letters, or a symbol, chosen per account in Settings → Accounts. Left
+automatic it is the first letter of the name — which only tells accounts apart while the letters
+differ, and the profile endpoint names every account after the same person, so a collision
+demotes *every* account to its position number rather than mixing letters and digits. Picking
+your own badges is the way out of that.
+
+**A spent window** replaces that account's bars with the time left on the **soonest** of its
+spent windows — the time, and nothing else. It used to be prefixed with the window's own short
+code, which put two durations side by side: `7d 3d` reads as a mistake, and which window frees
+up first is not something you can act on anyway. The budget is four characters, which is what the
+countdown formatter is tested against. The rest of the detail is one click away in the popover.
 
 The usable height is 18 pt, and bars shrink once an account has more than three windows. Past
 five, the menu bar stops being readable — the popover is the better place to look.

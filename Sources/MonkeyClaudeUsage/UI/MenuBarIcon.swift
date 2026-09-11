@@ -15,7 +15,7 @@ public enum MenuBarStyle: String, CaseIterable, Sendable {
 
 /// What the menu bar needs to know about one account — no Combine, no service.
 struct MenuBarAccount {
-    let tag: String
+    let badge: AccountBadge
     let limits: [UsageLimit]
 
     /// A saturated limit makes its bar useless: it is pinned at 100 % until the window
@@ -26,7 +26,8 @@ struct MenuBarAccount {
 private enum Metrics {
     static let height: CGFloat = 18
     static let labelWidth: CGFloat = 12
-    static let tagWidth: CGFloat = 8
+    static let symbolSize: CGFloat = 9
+    static let badgeFontSize: CGFloat = 8
     static let innerGap: CGFloat = 2
     static let accountGap: CGFloat = 6
     static let corner: CGFloat = 2
@@ -107,8 +108,9 @@ func renderMenuBarIcon(
 
         for (index, account) in accounts.enumerated() {
             if !usesRowLabels {
-                drawLabel(account.tag, x: x, y: 0, width: Metrics.tagWidth, rowHeight: Metrics.height, centered: true)
-                x += Metrics.tagWidth + Metrics.innerGap
+                let width = badgeWidth(account.badge)
+                drawBadge(account.badge, x: x, width: width)
+                x += width + Metrics.innerGap
             }
 
             if let blocking = account.blockingLimit {
@@ -124,7 +126,7 @@ func renderMenuBarIcon(
                 }
             }
 
-            x += blocks[index] - (usesRowLabels ? 0 : Metrics.tagWidth + Metrics.innerGap)
+            x += blocks[index] - (usesRowLabels ? 0 : badgeWidth(account.badge) + Metrics.innerGap)
             x += Metrics.accountGap
         }
     }
@@ -172,20 +174,37 @@ private func blockWidth(
     usesRowLabels: Bool,
     now: Date
 ) -> CGFloat {
-    let tag = usesRowLabels ? 0 : Metrics.tagWidth + Metrics.innerGap
+    let badge = usesRowLabels ? 0 : badgeWidth(account.badge) + Metrics.innerGap
     if let blocking = account.blockingLimit {
-        return tag + countdownText(for: blocking, now: now).size().width
+        return badge + countdownText(for: blocking, now: now).size().width
     }
-    return tag + barWidth
+    return badge + barWidth
 }
 
+private func badgeWidth(_ badge: AccountBadge) -> CGFloat {
+    switch badge {
+    case .symbol: Metrics.symbolSize
+    case let .text(value): max(Metrics.symbolSize, badgeText(value).size().width)
+    }
+}
+
+private func badgeText(_ value: String) -> NSAttributedString {
+    NSAttributedString(
+        string: value,
+        attributes: [
+            .font: NSFont.systemFont(ofSize: Metrics.badgeFontSize, weight: .semibold),
+            .foregroundColor: NSColor.black,
+        ]
+    )
+}
+
+/// Only the time left. It used to be prefixed with the window's own short code, which
+/// put two durations side by side — "7d 3d" reads as a mistake, and which window frees
+/// up first is not something you can act on anyway.
 private func countdownText(for limit: UsageLimit, now: Date) -> NSAttributedString {
     let value = limit.resetsAt.map { Countdown.short(until: $0, now: now) } ?? "—"
     let font = NSFont.monospacedDigitSystemFont(ofSize: Metrics.countdownFontSize, weight: .semibold)
-    return NSAttributedString(
-        string: "\(limit.shortLabel) \(value)",
-        attributes: [.font: font, .foregroundColor: NSColor.black]
-    )
+    return NSAttributedString(string: value, attributes: [.font: font, .foregroundColor: NSColor.black])
 }
 
 // MARK: - Drawing
@@ -212,6 +231,26 @@ private func drawLabel(
     let size = string.size()
     let originX = centered ? x + (width - size.width) / 2 : x + width - size.width
     string.draw(at: NSPoint(x: originX, y: y + (rowHeight - size.height) / 2))
+}
+
+private func drawBadge(_ badge: AccountBadge, x: CGFloat, width: CGFloat) {
+    switch badge {
+    case let .text(value):
+        let string = badgeText(value)
+        let size = string.size()
+        string.draw(at: NSPoint(x: x + (width - size.width) / 2, y: (Metrics.height - size.height) / 2))
+
+    case let .symbol(name):
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return }
+        let box = NSRect(
+            x: x, y: (Metrics.height - Metrics.symbolSize) / 2,
+            width: width, height: Metrics.symbolSize
+        )
+        // `respectFlipped` matters: the surrounding image is drawn flipped, and without
+        // it the symbol lands upside down.
+        symbol.draw(in: box, from: .zero, operation: .sourceOver, fraction: 1,
+                    respectFlipped: true, hints: nil)
+    }
 }
 
 private func drawCountdown(for limit: UsageLimit, x: CGFloat, now: Date) {
